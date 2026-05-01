@@ -59,9 +59,7 @@ void SimpleDram::pop(uint32_t cid) {
   _response_queue[cid].pop();
 }
 
-DramRamulator::DramRamulator(SimulationConfig config)
-    : _mem(std::make_unique<ram::Ramulator>(config.dram_config_path,
-                                            config.num_cores, false)) {
+DramRamulator::DramRamulator(SimulationConfig config) : _mem(std::make_unique<ram::Ramulator>(config.dram_config_path, config.num_cores, false)) {
   _n_ch = config.dram_channels;
   _config = config;
   _cycles = 0;
@@ -197,5 +195,102 @@ void DramRamulator2::pop(uint32_t cid) {
 void DramRamulator2::print_stat() {
   for (int ch = 0; ch < _n_ch; ch++) {
     _mem[ch]->print(stdout);
+  }
+}
+
+DramDRAMsim3::DramDRAMsim3(SimulationConfig config) {
+  _n_ch = config.dram_channels;
+  _req_size = config.dram_req_size;
+  _config = config;
+  _cycles = 0;
+  _tx_log2 = log2(_req_size);
+  _tx_ch_log2 = log2(_n_ch) + _tx_log2;
+
+  _mem.resize(_n_ch);
+  _pending.resize(_n_ch);
+  _response_queue.resize(_n_ch);
+
+  char* onnxim_path_env = std::getenv("ONNXIM_HOME");
+  std::string onnxim_path = onnxim_path_env != NULL ?
+      std::string(onnxim_path_env) : std::string("./");
+  std::string dramsim3_config = fs::path(onnxim_path)
+                                    .append("configs")
+                                    .append(config.dram_config_path)
+                                    .string();
+
+  for (int ch = 0; ch < _n_ch; ch++) {
+    _mem[ch] = std::make_unique<dramsim3::MemorySystem>(
+        dramsim3_config,
+        "./",
+        [this, ch](uint64_t addr) { this->read_callback(ch, addr);  },
+        [this, ch](uint64_t addr) { this->write_callback(ch, addr); }
+    );
+}
+}
+
+DramDRAMsim3::~DramDRAMsim3() {}
+
+bool DramDRAMsim3::running() {
+  return false;
+}
+
+void DramDRAMsim3::cycle() {
+  for (int ch = 0; ch < _n_ch; ch++) {
+    _mem[ch]->ClockTick();
+  }
+  _cycles++;
+}
+
+bool DramDRAMsim3::is_full(uint32_t cid, MemoryAccess* request) {
+  addr_type target_addr = request->dram_address;
+  target_addr = (target_addr >> _tx_ch_log2) << _tx_log2;
+  return !_mem[cid]->WillAcceptTransaction(target_addr, request->write);
+}
+
+void DramDRAMsim3::push(uint32_t cid, MemoryAccess* request) {
+  addr_type atomic_bytes = _config.dram_req_size;
+  addr_type target_addr = request->dram_address;
+  addr_type start_addr = target_addr - (target_addr % atomic_bytes);
+  assert(start_addr == target_addr);
+  assert(request->size == atomic_bytes);
+  target_addr = (target_addr >> _tx_ch_log2) << _tx_log2;
+  request->request = false;
+  _pending[cid][target_addr].push(request);  // push to queue, not overwrite
+  _mem[cid]->AddTransaction(target_addr, request->write);
+}
+
+bool DramDRAMsim3::is_empty(uint32_t cid) {
+  return _response_queue[cid].empty();
+}
+
+MemoryAccess* DramDRAMsim3::top(uint32_t cid) {
+  assert(!is_empty(cid));
+  return _response_queue[cid].front();
+}
+
+void DramDRAMsim3::pop(uint32_t cid) {
+  assert(!is_empty(cid));
+  _response_queue[cid].pop();
+}
+
+void DramDRAMsim3::read_callback(uint32_t cid, uint64_t addr) {
+  auto it = _pending[cid].find(addr);
+  if (it != _pending[cid].end() && !it->second.empty()) {
+    _response_queue[cid].push(it->second.front());
+    it->second.pop();
+    if (it->second.empty()) {
+      _pending[cid].erase(it);
+    }
+  }
+}
+
+void DramDRAMsim3::write_callback(uint32_t cid, uint64_t addr) {
+  read_callback(cid, addr);
+}
+
+void DramDRAMsim3::print_stat() {
+  for (int ch = 0; ch < _n_ch; ch++) {
+    spdlog::info("DRAMsim3 CH[{}] stats:", ch);
+    _mem[ch]->PrintStats();
   }
 }

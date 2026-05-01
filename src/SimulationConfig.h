@@ -7,7 +7,7 @@ using json = nlohmann::json;
 
 enum class CoreType { SYSTOLIC_OS, SYSTOLIC_WS };
 
-enum class DramType { SIMPLE, RAMULATOR1, RAMULATOR2 };
+enum class DramType { SIMPLE, RAMULATOR1, RAMULATOR2, DRAMSIM3 };
 
 enum class IcntType { SIMPLE, BOOKSIM2 };
 
@@ -54,7 +54,7 @@ struct SimulationConfig {
   uint32_t dram_nbl = 1; // busrt length in clock cycles (bust_length 8 in DDR -> 4 nbl)
   uint32_t dram_print_interval;
   std::string dram_config_path;
-
+  std::string dsent_config_path = "";
   /* ICNT config */
   IcntType icnt_type;
   uint32_t icnt_injection_ports_per_core = 1;

@@ -4,11 +4,14 @@
 #include <cstdint>
 #include <queue>
 #include <utility>
+#include <filesystem>
 
 #include "Common.h"
 #include "ramulator/Ramulator.hpp"
 #include "ramulator2.hh"
+#include "memory_system.h" // DRAMsim3
 
+namespace fs = std::filesystem;
 
 class Dram {
  public:
@@ -88,6 +91,46 @@ class DramRamulator2 : public Dram {
   std::vector<std::unique_ptr<NDPSim::Ramulator2>> _mem;
   int _tx_ch_log2;
   int _tx_log2;
+  int _req_size;
+};
+
+class DramDRAMsim3 : public Dram {
+ public:
+  DramDRAMsim3(SimulationConfig config);
+  ~DramDRAMsim3();
+
+  virtual bool running() override;
+  virtual void cycle() override;
+  virtual bool is_full(uint32_t cid, MemoryAccess* request) override;
+  virtual void push(uint32_t cid, MemoryAccess* request) override;
+  virtual bool is_empty(uint32_t cid) override;
+  virtual MemoryAccess* top(uint32_t cid) override;
+  virtual void pop(uint32_t cid) override;
+  virtual void print_stat() override;
+  
+  double getChannelEpochPowerMW(int ch) {
+    return _mem[ch]->GetEpochPowerMW();
+  }
+  double getEpochPowerMW() {
+    double total = 0.0;
+    for (int ch = 0; ch < _n_ch; ch++) {
+        total += _mem[ch]->GetEpochPowerMW();
+    }
+    return total;
+  }
+  int getNumChannels() const { return _n_ch; }
+
+ private:
+  void read_callback(uint32_t cid, uint64_t addr);
+  void write_callback(uint32_t cid, uint64_t addr);
+
+  std::vector<std::unique_ptr<dramsim3::MemorySystem>> _mem;
+  // pending: addr -> MemoryAccess* for callback lookup
+  std::vector<robin_hood::unordered_map<uint64_t, std::queue<MemoryAccess*>>> _pending;
+  // completed responses per channel
+  std::vector<std::queue<MemoryAccess*>> _response_queue;
+  int _tx_log2;
+  int _tx_ch_log2;
   int _req_size;
 };
 #endif

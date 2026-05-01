@@ -1,15 +1,13 @@
 #include "Simulator.h"
+#include "SystolicOS.h"
+#include "SystolicWS.h"
 
 #include <filesystem>
 #include <string>
 
-#include "SystolicOS.h"
-#include "SystolicWS.h"
-
 namespace fs = std::filesystem;
 
-Simulator::Simulator(SimulationConfig config, bool language_mode)
-    : _config(config), _core_cycles(0), _language_mode(language_mode) {
+Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(config), _core_cycles(0), _language_mode(language_mode) {
   // Create dram object
   spdlog::info("Simulator Configuration:");
   for (int i=0; i<config.num_cores;i++)
@@ -27,25 +25,25 @@ Simulator::Simulator(SimulationConfig config, bool language_mode)
   std::string(onnxim_path_env) : std::string("./");
   if (config.dram_type == DramType::SIMPLE) {
     _dram = std::make_unique<SimpleDram>(config);
-  } else if (config.dram_type == DramType::RAMULATOR1) {
-    std::string ramulator_config = fs::path(onnxim_path)
-                                       .append("configs")
-                                       .append(config.dram_config_path)
-                                       .string();
+  } 
+  else if (config.dram_type == DramType::RAMULATOR1) {
+    std::string ramulator_config = fs::path(onnxim_path).append("configs").append(config.dram_config_path).string();
     spdlog::info("Ramulator config: {}", ramulator_config);
     config.dram_config_path = ramulator_config;
     _dram = std::make_unique<DramRamulator>(config);
   } 
-  else if (config.dram_type == DramType::RAMULATOR2) 
-  {
-    std::string ramulator_config = fs::path(onnxim_path)
-                                       .append("configs")
-                                       .append(config.dram_config_path)
-                                       .string();
+  else if (config.dram_type == DramType::RAMULATOR2) {
+    std::string ramulator_config = fs::path(onnxim_path).append("configs").append(config.dram_config_path).string();
     spdlog::info("Ramulator2 config: {}", ramulator_config);
     config.dram_config_path = ramulator_config;
     _dram = std::make_unique<DramRamulator2>(config);
-  } 
+  }
+  else if (config.dram_type == DramType::DRAMSIM3) {
+    std::string dramsim3_config = fs::path(onnxim_path).append(config.dram_config_path).string();
+    spdlog::info("DRAMsim3 config: {}", dramsim3_config);
+    config.dram_config_path = dramsim3_config;
+    _dram = std::make_unique<DramDRAMsim3>(config);
+  }
   else {
     spdlog::error("[Configuration] Invalid DRAM type...!");
     exit(EXIT_FAILURE);
@@ -54,13 +52,25 @@ Simulator::Simulator(SimulationConfig config, bool language_mode)
   // Create interconnect object
   if (config.icnt_type == IcntType::SIMPLE) {
     _icnt = std::make_unique<SimpleInterconnect>(config);
-  } else if (config.icnt_type == IcntType::BOOKSIM2) {
+  } 
+  else if (config.icnt_type == IcntType::BOOKSIM2) {
     _icnt = std::make_unique<Booksim2Interconnect>(config);
-  } else {
+  } 
+  else {
     spdlog::error("[Configuration] {} Invalid interconnect type...!");
     exit(EXIT_FAILURE);
   }
   _icnt_interval = config.icnt_print_interval;
+
+  // Create DSENT wrapper for NoC energy estimation
+  if (!config.dsent_config_path.empty()) {
+    std::string dsent_config = fs::path(onnxim_path).append("configs").append(config.dsent_config_path).string();
+    spdlog::info("DSENT config: {}", dsent_config);
+    _dsent = std::make_unique<DSENTWrapper>(dsent_config);
+  } 
+  else {
+      spdlog::info("DSENT not configured, NoC power estimation disabled");
+  }
 
   // Create core objects
   _cores.resize(config.num_cores);
@@ -71,6 +81,7 @@ Simulator::Simulator(SimulationConfig config, bool language_mode)
   for (int core_index = 0; core_index < _n_cores; core_index++) {
     _cores[core_index] = Core::create(core_index, config);
   }
+  _dram_channel_energy_joules.resize(_config.dram_channels, 0.0);
 
   //Configure Hardware Scheduler
   _scheduler = Scheduler::create(_config, &_core_cycles, &_core_time, this);
@@ -111,8 +122,8 @@ void Simulator::cycle() {
   bool is_accum_tile;
   while (running()) {
     int model_id = 0;
-
     set_cycle_mask();
+
     // Core Cycle
     if (_cycle_mask & CORE_MASK) {
       /* Handle requested model */
@@ -138,10 +149,25 @@ void Simulator::cycle() {
       }
       _core_cycles++;
     }
-
     // DRAM cycle
     if (_cycle_mask & DRAM_MASK) {
       _dram->cycle();
+      _dram_cycles++;
+      if (_config.dram_print_interval && _dram_cycles % _config.dram_print_interval == 0) {
+        if (_config.dram_type == DramType::DRAMSIM3) {
+            auto* d3 = dynamic_cast<DramDRAMsim3*>(_dram.get());
+            if (d3) {
+                double epoch_sec = (_config.dram_print_interval *  _dram_period) * 1e-12;
+                for (int ch = 0; ch < d3->getNumChannels(); ch++) {
+                    double power_mw = d3->getChannelEpochPowerMW(ch);
+                    double energy_j = (power_mw * 1e-3) * epoch_sec;
+                    _dram_channel_energy_joules[ch] += energy_j;
+                    _dram_total_energy_joules     += energy_j;
+                    spdlog::info("[DRAM CH{}] power={:.4f}mW energy_so_far={:.4f}uJ cycles={}", ch, power_mw, _dram_channel_energy_joules[ch] * 1e6, _core_cycles);
+                }
+            }
+        }
+      }
     }
     // Interconnect cycle
     if (_cycle_mask & ICNT_MASK) {
@@ -172,40 +198,58 @@ void Simulator::cycle() {
       for (int mem_id = 0; mem_id < _n_memories; mem_id++) {
         // ICNT to memory
         int core_offset = _n_cores * _noc_node_per_core;
-        if (!_icnt->is_empty(core_offset + mem_id) &&
-            !_dram->is_full(mem_id, _icnt->top(core_offset+ mem_id))) {
+        if (!_icnt->is_empty(core_offset + mem_id) && !_dram->is_full(mem_id, _icnt->top(core_offset+ mem_id))) {
           _dram->push(mem_id, _icnt->top(core_offset + mem_id));
           _icnt->pop(core_offset + mem_id);
           _nr_to_mem++;
         }
         // Pop response to ICNT from dram
-        if (!_dram->is_empty(mem_id) &&
-            !_icnt->is_full(core_offset + mem_id, _dram->top(mem_id))) {
-          _icnt->push(core_offset + mem_id, get_dest_node(_dram->top(mem_id)),
-                      _dram->top(mem_id));
+        if (!_dram->is_empty(mem_id) && !_icnt->is_full(core_offset + mem_id, _dram->top(mem_id))) {
+          _icnt->push(core_offset + mem_id, get_dest_node(_dram->top(mem_id)), _dram->top(mem_id));
           _dram->pop(mem_id);
           _nr_from_mem++;
         }
       }
+      _total_flits_from_core += _nr_from_core;
       if (_icnt_interval!=0 && _icnt_cycle % _icnt_interval == 0) {
-        spdlog::info("[ICNT] Core->ICNT request {}GB/Sec", ((_memory_req_size*_nr_from_core*(1000/_icnt_period)/_icnt_interval)));
-        spdlog::info("[ICNT] Core<-ICNT request {}GB/Sec", ((_memory_req_size*_nr_to_core*(1000/_icnt_period)/_icnt_interval)));
-        spdlog::info("[ICNT] ICNT->MEM request {}GB/Sec", ((_memory_req_size*_nr_to_mem*(1000/_icnt_period)/_icnt_interval)));
-        spdlog::info("[ICNT] ICNT<-MEM request {}GB/Sec", ((_memory_req_size*_nr_from_mem*(1000/_icnt_period)/_icnt_interval)));
-        _nr_from_core=0;
-        _nr_to_core=0;
-        _nr_to_mem=0;
-        _nr_from_mem=0;
+        //spdlog::info("[ICNT] Core->ICNT request {}GB/Sec", ((_memory_req_size*_nr_from_core*(1000/_icnt_period)/_icnt_interval)));
+        //spdlog::info("[ICNT] Core<-ICNT request {}GB/Sec", ((_memory_req_size*_nr_to_core*(1000/_icnt_period)/_icnt_interval)));
+        //spdlog::info("[ICNT] ICNT->MEM request {}GB/Sec", ((_memory_req_size*_nr_to_mem*(1000/_icnt_period)/_icnt_interval)));
+        //spdlog::info("[ICNT] ICNT<-MEM request {}GB/Sec", ((_memory_req_size*_nr_from_mem*(1000/_icnt_period)/_icnt_interval)));
+        if (_dsent) {
+            // Per-epoch injection rate (current interval only)
+            double inj_rate = (double)_nr_from_core / (_icnt_interval * _n_cores * _noc_node_per_core + 1e-9);
+            inj_rate = std::clamp(inj_rate, 0.0, 1.0);
+
+            if (inj_rate > 0) {
+                double epoch_power_w = _dsent->computePower(inj_rate);  // capture return value
+                double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
+                _noc_energy_joules += epoch_power_w * epoch_sec;  // accumulate energy
+                spdlog::info("[DSENT] inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle:{}", inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
+            }
+        }
+        _nr_from_core = 0;
+        _nr_to_core   = 0;
+        _nr_to_mem    = 0;
+        _nr_from_mem  = 0;
       }
       _icnt->cycle();
     }
   }
-  spdlog::info("Simulation Finished at {} cycle {} us", _core_cycles, _core_cycles / (_config.core_freq) );
+  spdlog::info("Simulation Finished at {} cycle {} us", _core_cycles, _core_cycles / (_config.core_freq));
   /* Print simulation stats */
+  std::cout << "\n~~~~~~~~~~~~~~ Core results ~~~~~~~~~~~~~~\n";
   for (int core_id = 0; core_id < _n_cores; core_id++) {
     _cores[core_id]->print_stats();
   }
+  std::cout << "\n~~~~~~~~~~~~~~ NoC results ~~~~~~~~~~~~~~\n";
   _icnt->print_stats();
+  if (_dsent) {
+    double avg_inj_rate = (double)_total_flits_from_core / (_icnt_cycle * _n_cores * _noc_node_per_core + 1e-9);
+    avg_inj_rate = std::clamp(avg_inj_rate, 0.0, 1.0);
+    _dsent->printSummary(avg_inj_rate);
+  }
+  std::cout << "\n~~~~~~~~~~~~~~ Memory results ~~~~~~~~~~~~~~\n";
   _dram->print_stat();
 }
 

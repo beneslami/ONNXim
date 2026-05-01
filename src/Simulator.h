@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "scheduler/Scheduler.h"
 #include "scheduler/LanguageScheduler.h"
+#include "DSENTWrapper.h"
 #include <queue>
 
 #define CORE_MASK 0x1 << 1
@@ -43,6 +44,10 @@ class Simulator {
   std::unique_ptr<Dram> _dram;
   std::unique_ptr<Scheduler> _scheduler;
   
+  // NoC energy estimation
+  std::unique_ptr<DSENTWrapper> _dsent;
+  double _noc_energy_joules = 0.0;
+  
   // period information (ps)
   uint64_t _core_period;
   uint64_t _icnt_period;
@@ -53,7 +58,10 @@ class Simulator {
   uint64_t _dram_time;
 
   addr_type _dram_ch_stride_size;
-
+  uint64_t _dram_cycles    = 0;
+  std::vector<double> _dram_channel_energy_joules;  // per channel
+  double _dram_total_energy_joules = 0.0;           // sum
+  
   uint64_t _core_cycles;
 
   uint32_t _cycle_mask;
@@ -68,6 +76,8 @@ class Simulator {
   uint64_t _nr_to_mem=0;
   cycle_type _icnt_cycle=0;
   uint64_t _icnt_interval=0;
+  uint64_t _total_flits_from_core=0;
+
 
   struct CompareModel {
     bool operator()(const std::unique_ptr<Model>& a, const std::unique_ptr<Model>& b) const {

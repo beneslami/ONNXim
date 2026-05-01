@@ -40,7 +40,8 @@ const static std::map<std::string, CoreType> core_type_map = {
 const static std::map<std::string, DramType> dram_type_map = {
   {"simple", DramType::SIMPLE},
   {"ramulator", DramType::RAMULATOR1},
-  {"ramulator2", DramType::RAMULATOR2}
+  {"ramulator2", DramType::RAMULATOR2},
+  {"dramsim3", DramType::DRAMSIM3}
 };
 
 const static std::map<std::string, IcntType> icnt_type_map = {
@@ -121,6 +122,11 @@ SimulationConfig initialize_config(json config) {
     throw std::runtime_error(fmt::format("Not implemented icnt type {} ", icnt_type));
   }
 
+  // DSENT config
+  if (config.contains("dsent_config_path")) {
+    parsed_config.dsent_config_path = config["dsent_config_path"];
+  }
+  
   parsed_config.icnt_freq = get_config_value<uint32_t>(config, "icnt_freq");
   if (config.contains("icnt_latency"))
     parsed_config.icnt_latency = config["icnt_latency"];
