@@ -242,3 +242,4 @@ If you use ONNXim for your research, please cite the following paper.
   keywords={Random access memory;Computational modeling;Vectors;Kernel;Tensors;Runtime;Libraries;Deep learning;Artificial neural networks;Systolic arrays;DNN inference;multi-tenancy;NPU;ONNX;simulator},
   doi={10.1109/LCA.2024.3484648}}
 ```
+./build/bin/Simulator --config ./configs/systolic_ws_128x128_c4_simple_noc_tpuv4.json --model ./example/models_list.json

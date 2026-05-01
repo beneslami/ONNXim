@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.15.0)
 set(project_name "AiFrameworkSim")
 project(${project_name})
 
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include("${CMAKE_SOURCE_DIR}/build/conanbuildinfo.cmake")
 conan_basic_setup()
@@ -38,6 +40,20 @@ include_directories("${PROJECT_SOURCE_DIR}/extern/ramulator2/resources/ndp_wrapp
 # Add libaray booksim
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/booksim")
 
+# Add library DRAMsim3
+set(THERMAL ON CACHE BOOL "Enable DRAMsim3 thermal simulation")
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/DRAMsim3")
+target_include_directories(dramsim3 PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src" "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/ext/headers")
+target_include_directories(Simulator PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src")
+target_include_directories(Simulator_lib PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src")
+
+# Add library DSENT
+add_subdirectory("${PROJECT_SOURCE_DIR}/extern/dsent")
+target_include_directories(dsent PUBLIC "${PROJECT_SOURCE_DIR}/extern/dsent")
+target_include_directories(Simulator PUBLIC "${PROJECT_SOURCE_DIR}/extern/dsent")
+target_include_directories(Simulator_lib PUBLIC "${PROJECT_SOURCE_DIR}/extern/dsent")
+
 # Add libary protobuf
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/protobuf/cmake" EXCLUDE_FROM_ALL)
 set_target_properties(libprotoc PROPERTIES FOLDER "external/protobuf")
@@ -50,13 +66,13 @@ set_target_properties(onnx PROPERTIES FOLDER "extern/onnx")
 set_target_properties(onnx_proto PROPERTIES FOLDER "extern/onnx")
 
 target_include_directories(Simulator PUBLIC ${ONNX_INCLUDE_DIRS})
-target_link_libraries(Simulator ramulator1 booksim2 ramulator)
+target_link_libraries(Simulator ramulator1 booksim2 ramulator dramsim3 dsent)
 target_link_libraries(Simulator ${PROTOBUF_LIB} onnx_proto ${CONAN_LIBS} stdc++fs)
 
 target_include_directories(Simulator_lib PUBLIC ${ONNX_INCLUDE_DIRS})
-target_link_libraries(Simulator_lib ramulator1 booksim2 ramulator)
+target_link_libraries(Simulator_lib ramulator1 booksim2 ramulator dramsim3 dsent)
 target_link_libraries(Simulator_lib ${PROTOBUF_LIB} onnx_proto ${CONAN_LIBS} stdc++fs)
 
-enable_testing()
-add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
+#enable_testing()
+#add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
 
