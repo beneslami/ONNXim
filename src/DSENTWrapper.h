@@ -37,11 +37,6 @@ public:
         _config["InjectionRate"] = LibUtil::String(injection_rate);
         std::map<std::string, double> outputs;
         DSENT::run(_config, _ms_model, outputs);
-
-        // Debug: print all keys in outputs map
-        //for (const auto& kv : outputs) {
-        //    spdlog::info("[DSENT DEBUG] key='{}' value={}", kv.first, kv.second);
-        //}
         auto it = outputs.find("total");
         return (it != outputs.end()) ? it->second : 0.0;
     }

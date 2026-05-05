@@ -42,7 +42,15 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     std::string dramsim3_config = fs::path(onnxim_path).append(config.dram_config_path).string();
     spdlog::info("DRAMsim3 config: {}", dramsim3_config);
     config.dram_config_path = dramsim3_config;
-    _dram = std::make_unique<DramDRAMsim3>(config);
+    //_dram = std::make_unique<DramDRAMsim3>(config);
+    auto* d3 = new DramDRAMsim3(config, _config.dram_freq);
+    _dram_stats = d3;
+    _dram.reset(d3);
+  }
+  if(!config.dsent_config_path.empty()) {
+    std::string dsent_config = fs::path(onnxim_path).append("configs").append(config.dsent_config_path).string();
+    spdlog::info("DSENT config: {}", dsent_config);
+    _dsent = std::make_unique<DSENTWrapper>(dsent_config);
   }
   else {
     spdlog::error("[Configuration] Invalid DRAM type...!");
@@ -61,7 +69,7 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     exit(EXIT_FAILURE);
   }
   _icnt_interval = config.icnt_print_interval;
-
+  
   // Create DSENT wrapper for NoC energy estimation
   if (!config.dsent_config_path.empty()) {
     std::string dsent_config = fs::path(onnxim_path).append("configs").append(config.dsent_config_path).string();
@@ -82,6 +90,9 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     _cores[core_index] = Core::create(core_index, config);
   }
   _dram_channel_energy_joules.resize(_config.dram_channels, 0.0);
+  _noc_node_energy_joules.resize(_n_cores / _noc_node_per_core, 0.0);
+  _noc_node_power_mw.resize(_n_cores / _noc_node_per_core, 0.0);
+  _nr_from_core_list.resize(_n_cores / _noc_node_per_core, 0);
 
   //Configure Hardware Scheduler
   _scheduler = Scheduler::create(_config, &_core_cycles, &_core_time, this);
@@ -155,15 +166,17 @@ void Simulator::cycle() {
       _dram_cycles++;
       if (_config.dram_print_interval && _dram_cycles % _config.dram_print_interval == 0) {
         if (_config.dram_type == DramType::DRAMSIM3) {
-            auto* d3 = dynamic_cast<DramDRAMsim3*>(_dram.get());
-            if (d3) {
+            if (_dram_stats) {
+                _dram_stats->collectEpochStats();
                 double epoch_sec = (_config.dram_print_interval *  _dram_period) * 1e-12;
-                for (int ch = 0; ch < d3->getNumChannels(); ch++) {
-                    double power_mw = d3->getChannelEpochPowerMW(ch);
+                for (int ch = 0; ch < _dram_stats->getNumChannels(); ch++) {
+                    double power_mw = _dram_stats->getChannelEpochPowerMW(ch);
                     double energy_j = (power_mw * 1e-3) * epoch_sec;
                     _dram_channel_energy_joules[ch] += energy_j;
                     _dram_total_energy_joules     += energy_j;
                     spdlog::info("[DRAM CH{}] power={:.4f}mW energy_so_far={:.4f}uJ cycles={}", ch, power_mw, _dram_channel_energy_joules[ch] * 1e6, _core_cycles);
+                    spdlog::info("[DRAM CH{}] bandwidth={:.2f} GB/s", ch, _dram_stats->getBandwidthGBpsPerChannel(ch));
+                    spdlog::info("[DRAM CH{}] bandwidth_utilization={:.2f}%", ch, _dram_stats->getBandwidthUtilizationPerChannel(ch));
                 }
             }
         }
@@ -184,6 +197,7 @@ void Simulator::cycle() {
               _icnt->push(port_id, get_dest_node(front), front);
               _cores[core_id]->pop_memory_request();
               _nr_from_core++;
+              _nr_from_core_list[core_id / _noc_node_per_core]++;
             }
           }
           // Push response from ICNT. to Core.
@@ -218,14 +232,18 @@ void Simulator::cycle() {
         //spdlog::info("[ICNT] ICNT<-MEM request {}GB/Sec", ((_memory_req_size*_nr_from_mem*(1000/_icnt_period)/_icnt_interval)));
         if (_dsent) {
             // Per-epoch injection rate (current interval only)
-            double inj_rate = (double)_nr_from_core / (_icnt_interval * _n_cores * _noc_node_per_core + 1e-9);
-            inj_rate = std::clamp(inj_rate, 0.0, 1.0);
-
-            if (inj_rate > 0) {
-                double epoch_power_w = _dsent->computePower(inj_rate);  // capture return value
-                double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
-                _noc_energy_joules += epoch_power_w * epoch_sec;  // accumulate energy
-                spdlog::info("[DSENT] inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle:{}", inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
+            for(int i = 0; i < _nr_from_core_list.size(); i++) {
+                double core_inj_rate = (double)_nr_from_core_list[i] / (_icnt_interval * _noc_node_per_core + 1e-9);
+                core_inj_rate = std::clamp(core_inj_rate, 0.0, 1.0);
+                if(core_inj_rate > 0) {
+                  double epoch_power_w = _dsent->computePower(core_inj_rate);  // capture return value
+                  double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
+                  double _noc_energy_joules = epoch_power_w * epoch_sec;  // accumulate energy
+                  _total_noc_energy_joules += _noc_energy_joules;
+                  _total_noc_power_w += epoch_power_w;
+                  spdlog::info("[DSENT] Router={} inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle={}", i, core_inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
+                  _nr_from_core_list[i] = 0; // reset for next interval
+                }
             }
         }
         _nr_from_core = 0;
@@ -245,12 +263,18 @@ void Simulator::cycle() {
   std::cout << "\n~~~~~~~~~~~~~~ NoC results ~~~~~~~~~~~~~~\n";
   _icnt->print_stats();
   if (_dsent) {
-    double avg_inj_rate = (double)_total_flits_from_core / (_icnt_cycle * _n_cores * _noc_node_per_core + 1e-9);
-    avg_inj_rate = std::clamp(avg_inj_rate, 0.0, 1.0);
-    _dsent->printSummary(avg_inj_rate);
+    std::cout << "total injected flits: " << _total_flits_from_core << "\n";
+    std::cout << "total NoC energy (J): " << _total_noc_energy_joules << " J\n";
+    std::cout << "total NoC power (W): " << _total_noc_power_w << " W\n";
+    std::cout << "average energy per flit (J): " << (_total_flits_from_core > 0 ? _total_noc_energy_joules / _total_flits_from_core : 0.0) << " J\n";
+    std::cout << "average power per flit (W): " << (_total_flits_from_core > 0 ? (_total_noc_power_w) / _total_flits_from_core : 0.0) << " W\n";
+    _dsent->printSummary(_total_flits_from_core / _icnt_cycle); //FIX me
   }
   std::cout << "\n~~~~~~~~~~~~~~ Memory results ~~~~~~~~~~~~~~\n";
-  _dram->print_stat();
+  //_dram->print_stat(); prints nothing
+  std::cout << "Aggregate Bandwidth: " << _dram_stats->getAggregateBandwidthGBps() << " GB/s\n";
+  std::cout << "Aggregate Bandwidth Utilization: " << _dram_stats->getAggregateBandwidthUtilization() << " %\n";
+  std::cout << "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";
 }
 
 void Simulator::register_model(std::unique_ptr<Model> model) {

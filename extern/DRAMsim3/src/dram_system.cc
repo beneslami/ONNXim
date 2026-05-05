@@ -52,9 +52,7 @@ void BaseDRAMSystem::PrintEpochStats() {
 
 void BaseDRAMSystem::PrintStats() {
     // Finish epoch output, remove last comma and append ]
-    std::ofstream epoch_out(config_.json_epoch_name, std::ios_base::in |
-                                                         std::ios_base::out |
-                                                         std::ios_base::ate);
+    std::ofstream epoch_out(config_.json_epoch_name, std::ios_base::in | std::ios_base::out | std::ios_base::ate);
     epoch_out.seekp(-2, std::ios_base::cur);
     epoch_out.write("]", 1);
     epoch_out.close();

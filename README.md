@@ -1,17 +1,4 @@
 # ONNXim: A Fast, Cycle-level Multi-core NPU Simulator
-[![Docker Image CI](https://github.com/PSAL-POSTECH/ONNXim/actions/workflows/docker-image.yml/badge.svg)](https://github.com/PSAL-POSTECH/ONNXim/actions/workflows/docker-image.yml)
-
-ONNXim is a fast cycle-level simulator that can model multi-core NPUs for DNN inference. Its features include the following:
-- Faster simulation speed in comparison to other _detailed_ NPU simulation frameworks (see the figure below).
-- Support for modeling multi-core NPUs.
-- Support for cycle-level simulation of memory (through [Ramulator](https://github.com/CMU-SAFARI/ramulator)) and network-on-chip (through [Booksim2](https://github.com/booksim/booksim2)), which is important for properly modeling memory-bound operations in deep learning.
-- Use of ONNX graphs as DNN model specifications, enabling simulation of DNNs implemented in different deep learning frameworks (e.g., PyTorch and TensorFlow).
-- Support language models that do not use ONNX graphs. Additionally, enable auto-regressive generation phases and iteration-level batching.
-
-For more details, please refer to our [paper](https://ieeexplore.ieee.org/document/10726822)!
-
-![Speedup](/img/speedup.png)
-**Figure description**: we compare the simulation speed of ONNXim to that of [Accel-sim](https://accel-sim.github.io/) (a GPU simulator with Tensor Core model) as GPUs are widely used for deep learning and such a GPU simulator can be used to study systems for deep learning. We also include [SMAUG](https://github.com/harvard-acc/smaug) in the comparison. On the x-axis, we vary the size of each dimension for an NxNxN GEMM operation.
 
 ## Requirements
 ### OS Distribution
@@ -130,7 +117,7 @@ $ docker run -it onnxim
 ## 2. Manual Method
 ### Installation
 ```
-$ git clone https://github.com/PSAL-POSTECH/ONNXim.git
+$ git clone https://github.com/beneslami/ONNXim.git
 $ cd ONNXim
 $ git submodule update --recursive --init
 ```

@@ -4,6 +4,9 @@ project(${project_name})
 
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
+include(ExternalProject)
+include(ProcessorCount)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include("${CMAKE_SOURCE_DIR}/build/conanbuildinfo.cmake")
 conan_basic_setup()
@@ -26,13 +29,28 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_link_options(-fsanitize=address)
 endif()
 
+ExternalProject_Add(superlu_mt_build
+    SOURCE_DIR "${PROJECT_SOURCE_DIR}/extern/superlu_mt-4.0.0"
+    BUILD_IN_SOURCE TRUE
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    BUILD_BYPRODUCTS
+        "${PROJECT_SOURCE_DIR}/extern/superlu_mt-4.0.0/lib/libsuperlu_mt_OPENMP.a"
+)
+
+set(SUPERLU
+    "${PROJECT_SOURCE_DIR}/extern/superlu_mt-4.0.0/lib/libsuperlu_mt_OPENMP.a"
+    CACHE FILEPATH "SuperLU_MT library" FORCE
+)
+
 # Build source
 add_subdirectory("${PROJECT_SOURCE_DIR}/src")
 
 # Add libaray ramulator
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/ramulator_custom")
 
-# Add libaray ramulator
+# Add libaray ramulator2
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/ramulator2")
 include_directories("${PROJECT_SOURCE_DIR}/extern/ramulator2/src")
 include_directories("${PROJECT_SOURCE_DIR}/extern/ramulator2/resources/ndp_wrappers")
@@ -41,9 +59,10 @@ include_directories("${PROJECT_SOURCE_DIR}/extern/ramulator2/resources/ndp_wrapp
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/booksim")
 
 # Add library DRAMsim3
-set(THERMAL ON CACHE BOOL "Enable DRAMsim3 thermal simulation")
+set(THERMAL OFF CACHE BOOL "Enable DRAMsim3 thermal simulation")
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 add_subdirectory("${PROJECT_SOURCE_DIR}/extern/DRAMsim3")
+add_dependencies(dramsim3 superlu_mt_build)
 target_include_directories(dramsim3 PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src" "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/ext/headers")
 target_include_directories(Simulator PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src")
 target_include_directories(Simulator_lib PUBLIC "${PROJECT_SOURCE_DIR}/extern/DRAMsim3/src")

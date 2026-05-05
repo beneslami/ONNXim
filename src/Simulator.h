@@ -42,12 +42,18 @@ class Simulator {
   std::vector<std::unique_ptr<Core>> _cores;
   std::unique_ptr<Interconnect> _icnt;
   std::unique_ptr<Dram> _dram;
+  DramWithStats* _dram_stats = nullptr;
   std::unique_ptr<Scheduler> _scheduler;
   
   // NoC energy estimation
   std::unique_ptr<DSENTWrapper> _dsent;
-  double _noc_energy_joules = 0.0;
-  
+  double _total_noc_energy_joules = 0.0;
+  double _total_noc_power_w = 0.0;
+  double _average_energy_per_flit_joules = 0.0;
+  double _average_power_per_flit_mw = 0.0;
+  std::vector<double> _noc_node_energy_joules;  // per node
+  std::vector<double> _noc_node_power_mw;     // per node
+
   // period information (ps)
   uint64_t _core_period;
   uint64_t _icnt_period;
@@ -71,6 +77,7 @@ class Simulator {
 
   // Icnt stat
   uint64_t _nr_from_core=0;
+  std::vector<uint64_t> _nr_from_core_list; // per core
   uint64_t _nr_to_core=0;
   uint64_t _nr_from_mem=0;
   uint64_t _nr_to_mem=0;
@@ -84,9 +91,8 @@ class Simulator {
         return a->get_request_time() > b->get_request_time();
     }
   };
-  robin_hood::unordered_map<std::string, 
-    std::vector<std::unique_ptr<Tensor>>> _weight_table;
-  std::vector<std::unique_ptr<Model>>  _models;
+  robin_hood::unordered_map<std::string, std::vector<std::unique_ptr<Tensor>>> _weight_table;
+  std::vector<std::unique_ptr<Model>> _models;
   robin_hood::unordered_map<std::string, std::unique_ptr<Model>> _language_models;
   std::vector<std::chrono::time_point<std::chrono::high_resolution_clock>> _tile_timestamp;
 
