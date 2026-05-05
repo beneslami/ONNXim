@@ -1,0 +1,31 @@
+Core0 :
+    position    0,    0 ;
+    dimension 4000, 4000 ;
+
+Core1 :
+    position 4000,    0 ;
+    dimension 4000, 4000 ;
+
+Core2 :
+    position    0, 4000 ;
+    dimension 4000, 4000 ;
+
+Core3 :
+    position 4000, 4000 ;
+    dimension 4000, 4000 ;
+
+Router0 :
+    position    0, 8000 ;
+    dimension 2000, 1000 ;
+
+Router1 :
+    position 2000, 8000 ;
+    dimension 2000, 1000 ;
+
+Router2 :
+    position 4000, 8000 ;
+    dimension 2000, 1000 ;
+
+Router3 :
+    position 6000, 8000 ;
+    dimension 2000, 1000 ;

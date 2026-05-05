@@ -128,7 +128,7 @@ endif
  ##############################################################################
 
 SLU_VERSION = 4.0.0
-SLU_MAIN    = $(3DICE_MAIN)/superlu_mt-$(SLU_VERSION)
+SLU_MAIN    = ../superlu_mt-$(SLU_VERSION)
 SLU_INCLUDE = $(SLU_MAIN)/SRC
 SLU_LIB     = $(SLU_MAIN)/lib
 SLU_LIBS    = -L$(SLU_LIB) -lsuperlu_mt_OPENMP$(PLAT) -L/lib/x86_64-linux-gnu -lopenblas

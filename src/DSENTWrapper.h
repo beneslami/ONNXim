@@ -6,6 +6,8 @@
 #include <map>
 #include <string>
 #include <filesystem>
+#include <unistd.h>
+#include <fcntl.h>
 #include "DSENT.h"
 #include "libutil/String.h"
 
@@ -36,7 +38,17 @@ public:
     double computePower(double injection_rate) {
         _config["InjectionRate"] = LibUtil::String(injection_rate);
         std::map<std::string, double> outputs;
+        // Suppress DSENT's print statement console output
+        int saved_stdout = dup(STDOUT_FILENO);
+        int devnull = open("/dev/null", O_WRONLY);
+        dup2(devnull, STDOUT_FILENO);
+        close(devnull);
+
         DSENT::run(_config, _ms_model, outputs);
+
+        // Restore stdout
+        dup2(saved_stdout, STDOUT_FILENO);
+        close(saved_stdout);
         auto it = outputs.find("total");
         return (it != outputs.end()) ? it->second : 0.0;
     }

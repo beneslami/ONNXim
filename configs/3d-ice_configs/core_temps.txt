@@ -1,0 +1,2 @@
+% Maximum temperatures for the floorplan of the die CORE_STACK
+% Time(s) 	 Core0(K) 	 Core1(K) 	 Core2(K) 	 Core3(K) 	 Router0(K) 	 Router1(K) 	 Router2(K) 	 Router3(K) 	 

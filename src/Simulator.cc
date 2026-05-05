@@ -56,6 +56,17 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     spdlog::error("[Configuration] Invalid DRAM type...!");
     exit(EXIT_FAILURE);
   }
+  if (!config.threedice_stk_path.empty()) {
+    std::string stk_path = fs::path(onnxim_path).append("configs").append(config.threedice_stk_path).string();
+    spdlog::info("[3DICE] Loading stack file: {}", stk_path);
+    _3dice = std::make_unique<ThreeDICEWrapper>(stk_path);
+    _3dice_interval = (uint64_t)(_3dice->getStepTimeSec() * _config.core_freq * 1e6);
+    spdlog::info("[3DICE] Thermal step interval: {} core cycles", _3dice_interval);
+  }
+  else{
+    spdlog::error("[Configuration] Invalid 3DICE configuration...!");
+    exit(EXIT_FAILURE);
+  }
 
   // Create interconnect object
   if (config.icnt_type == IcntType::SIMPLE) {
@@ -69,7 +80,7 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     exit(EXIT_FAILURE);
   }
   _icnt_interval = config.icnt_print_interval;
-  
+
   // Create DSENT wrapper for NoC energy estimation
   if (!config.dsent_config_path.empty()) {
     std::string dsent_config = fs::path(onnxim_path).append("configs").append(config.dsent_config_path).string();
@@ -93,6 +104,9 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
   _noc_node_energy_joules.resize(_n_cores / _noc_node_per_core, 0.0);
   _noc_node_power_mw.resize(_n_cores / _noc_node_per_core, 0.0);
   _nr_from_core_list.resize(_n_cores / _noc_node_per_core, 0);
+  _core_power_w.resize(_n_cores, 0.0);
+  _hbm_power_w.resize(_n_memories, 0.0);
+  _noc_power_w.resize(_n_cores / _noc_node_per_core, 0.0);
 
   //Configure Hardware Scheduler
   _scheduler = Scheduler::create(_config, &_core_cycles, &_core_time, this);
@@ -158,6 +172,12 @@ void Simulator::cycle() {
         }
         _cores[core_id]->cycle();
       }
+      if(_config.system_print_interval && _3dice) {
+        for (int core_id = 0; core_id < _n_cores; core_id++) {
+          double core_power = 1.4; //_cores[core_id]->get_power();
+          _core_power_w[core_id] = core_power;
+        }
+      }
       _core_cycles++;
     }
     // DRAM cycle
@@ -166,19 +186,20 @@ void Simulator::cycle() {
       _dram_cycles++;
       if (_config.dram_print_interval && _dram_cycles % _config.dram_print_interval == 0) {
         if (_config.dram_type == DramType::DRAMSIM3) {
-            if (_dram_stats) {
-                _dram_stats->collectEpochStats();
-                double epoch_sec = (_config.dram_print_interval *  _dram_period) * 1e-12;
-                for (int ch = 0; ch < _dram_stats->getNumChannels(); ch++) {
-                    double power_mw = _dram_stats->getChannelEpochPowerMW(ch);
-                    double energy_j = (power_mw * 1e-3) * epoch_sec;
-                    _dram_channel_energy_joules[ch] += energy_j;
-                    _dram_total_energy_joules     += energy_j;
-                    spdlog::info("[DRAM CH{}] power={:.4f}mW energy_so_far={:.4f}uJ cycles={}", ch, power_mw, _dram_channel_energy_joules[ch] * 1e6, _core_cycles);
-                    spdlog::info("[DRAM CH{}] bandwidth={:.2f} GB/s", ch, _dram_stats->getBandwidthGBpsPerChannel(ch));
-                    spdlog::info("[DRAM CH{}] bandwidth_utilization={:.2f}%", ch, _dram_stats->getBandwidthUtilizationPerChannel(ch));
-                }
+          if (_dram_stats) {
+            _dram_stats->collectEpochStats();
+            double epoch_sec = (_config.dram_print_interval *  _dram_period) * 1e-12;
+            for (int ch = 0; ch < _dram_stats->getNumChannels(); ch++) {
+                double power_mw = _dram_stats->getChannelEpochPowerMW(ch);
+                _hbm_power_w[ch] = power_mw;
+                double energy_j = (power_mw * 1e-3) * epoch_sec;
+                _dram_channel_energy_joules[ch] += energy_j;
+                _dram_total_energy_joules     += energy_j;
+                spdlog::info("[DRAM CH{}] power={:.4f}mW energy_so_far={:.4f}uJ cycles={}", ch, power_mw, _dram_channel_energy_joules[ch] * 1e6, _core_cycles);
+                spdlog::info("[DRAM CH{}] bandwidth={:.2f} GB/s", ch, _dram_stats->getBandwidthGBpsPerChannel(ch));
+                spdlog::info("[DRAM CH{}] bandwidth_utilization={:.2f}%", ch, _dram_stats->getBandwidthUtilizationPerChannel(ch));
             }
+          }
         }
       }
     }
@@ -225,26 +246,29 @@ void Simulator::cycle() {
         }
       }
       _total_flits_from_core += _nr_from_core;
-      if (_icnt_interval!=0 && _icnt_cycle % _icnt_interval == 0) {
+      if (_icnt_interval != 0 && _icnt_cycle % _icnt_interval == 0) {
         //spdlog::info("[ICNT] Core->ICNT request {}GB/Sec", ((_memory_req_size*_nr_from_core*(1000/_icnt_period)/_icnt_interval)));
         //spdlog::info("[ICNT] Core<-ICNT request {}GB/Sec", ((_memory_req_size*_nr_to_core*(1000/_icnt_period)/_icnt_interval)));
         //spdlog::info("[ICNT] ICNT->MEM request {}GB/Sec", ((_memory_req_size*_nr_to_mem*(1000/_icnt_period)/_icnt_interval)));
         //spdlog::info("[ICNT] ICNT<-MEM request {}GB/Sec", ((_memory_req_size*_nr_from_mem*(1000/_icnt_period)/_icnt_interval)));
         if (_dsent) {
-            // Per-epoch injection rate (current interval only)
-            for(int i = 0; i < _nr_from_core_list.size(); i++) {
-                double core_inj_rate = (double)_nr_from_core_list[i] / (_icnt_interval * _noc_node_per_core + 1e-9);
-                core_inj_rate = std::clamp(core_inj_rate, 0.0, 1.0);
-                if(core_inj_rate > 0) {
-                  double epoch_power_w = _dsent->computePower(core_inj_rate);  // capture return value
-                  double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
-                  double _noc_energy_joules = epoch_power_w * epoch_sec;  // accumulate energy
-                  _total_noc_energy_joules += _noc_energy_joules;
-                  _total_noc_power_w += epoch_power_w;
-                  spdlog::info("[DSENT] Router={} inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle={}", i, core_inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
-                  _nr_from_core_list[i] = 0; // reset for next interval
-                }
+          // Per-epoch injection rate (current interval only)
+          for(int i = 0; i < _nr_from_core_list.size(); i++) {
+            double core_inj_rate = (double)_nr_from_core_list[i] / (_icnt_interval * _noc_node_per_core + 1e-9);
+            core_inj_rate = std::clamp(core_inj_rate, 0.0, 1.0);
+            if(core_inj_rate > 0) {
+              double epoch_power_w = _dsent->computePower(core_inj_rate);  // capture return value
+              if(_config.system_print_interval && _3dice) {
+                _noc_node_power_mw[i/_noc_node_per_core] = epoch_power_w;
+              }
+              double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
+              double _noc_energy_joules = epoch_power_w * epoch_sec;  // accumulate energy
+              _total_noc_energy_joules += _noc_energy_joules;
+              _total_noc_power_w += epoch_power_w;
+              spdlog::info("[DSENT] Router={} inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle={}", i, core_inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
+              _nr_from_core_list[i] = 0; // reset for next interval
             }
+          }
         }
         _nr_from_core = 0;
         _nr_to_core   = 0;
@@ -252,6 +276,42 @@ void Simulator::cycle() {
         _nr_from_mem  = 0;
       }
       _icnt->cycle();
+    }
+
+    // Thermal calculation with 3DICE
+    if(_config.system_print_interval && _core_cycles % _config.system_print_interval == 0) {
+      for(auto & hbm_power : _hbm_power_w) {
+        _systemPower.push_back(hbm_power);
+      }
+      for(auto & core_power : _core_power_w) {
+        _systemPower.push_back(core_power);
+      }
+      for(auto & noc_power : _noc_power_w) {
+        _systemPower.push_back(noc_power);
+      }
+      auto temps = _3dice->computeTemperatures(_systemPower);
+      int idx = 0;
+      int n_routers = _n_cores / _noc_node_per_core;
+      // DRAM temperatures
+      if (_dram_stats) {
+          for (int ch = 0; ch < _dram_stats->getNumChannels(); ch++) {
+              _peak_hbm_temp_c = std::max(_peak_hbm_temp_c, temps[idx]);
+              spdlog::info("[3DICE][DRAM CH{}] temp={:.2f}°C", ch, temps[idx]);
+              idx++;
+          }
+      }
+      // Core temperatures
+      for (int i = 0; i < _n_cores; i++) {
+          _peak_core_temp_c = std::max(_peak_core_temp_c, temps[idx]);
+          spdlog::info("[3DICE][Core{}] temp={:.2f}°C", i, temps[idx]);
+          idx++;
+      }
+      // Router temperatures — store for DSENT block to read
+      for (int i = 0; i < n_routers; i++) {
+          spdlog::info("[3DICE][Router{}] temp={:.2f}°C", i, temps[idx]);
+          idx++;
+      }
+      _systemPower.clear(); // Clear for next interval
     }
   }
   spdlog::info("Simulation Finished at {} cycle {} us", _core_cycles, _core_cycles / (_config.core_freq));

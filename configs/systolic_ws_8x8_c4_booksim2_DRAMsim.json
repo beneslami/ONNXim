@@ -104,7 +104,9 @@
   "icnt_config_path" : "../configs/booksim2_configs/fly_c4_m2.icnt",
 
   "dsent_config_path": "DSENT_configs/electrical-clos.cfg",
-
+  "threedice_stk_path": "3d-ice_configs/onnxim_npu.stk",
+  "system_print_interval" : 10000,
+  
   "precision" : 2,
   "layout" : "NHWC",
   "scheduler" : "simple"

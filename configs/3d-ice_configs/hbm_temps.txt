@@ -1,0 +1,2 @@
+% Maximum temperatures for the floorplan of the die HBM_STACK
+% Time(s) 	 HBM_CH0(K) 	 HBM_CH1(K) 	 

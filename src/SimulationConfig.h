@@ -42,6 +42,7 @@ struct SimulationConfig {
   uint32_t num_cores;
   uint32_t core_freq;
   uint32_t core_print_interval;
+  uint32_t system_print_interval;
   struct CoreConfig *core_config;
 
   /* DRAM config */
@@ -55,6 +56,8 @@ struct SimulationConfig {
   uint32_t dram_print_interval;
   std::string dram_config_path;
   std::string dsent_config_path = "";
+  std::string threedice_stk_path = "";
+  double peak_core_power_w = 0.15; 
   /* ICNT config */
   IcntType icnt_type;
   uint32_t icnt_injection_ports_per_core = 1;

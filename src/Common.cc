@@ -57,7 +57,8 @@ SimulationConfig initialize_config(json config) {
   parsed_config.core_config = new struct CoreConfig[parsed_config.num_cores];
   parsed_config.core_freq = get_config_value<uint32_t>(config, "core_freq");
   parsed_config.core_print_interval = get_config_value<uint32_t>(config, "core_print_interval");
-
+  parsed_config.system_print_interval = get_config_value<uint32_t>(config, "system_print_interval");
+  
   for (int i=0; i<parsed_config.num_cores; i++) {
     std::string core_id = "core_" + std::to_string(i);
     auto core_config = config["core_config"][core_id];
@@ -127,6 +128,12 @@ SimulationConfig initialize_config(json config) {
     parsed_config.dsent_config_path = config["dsent_config_path"];
   }
   
+  // 3D-ICE config
+  if (config.contains("threedice_stk_path"))
+    parsed_config.threedice_stk_path = config["threedice_stk_path"];
+  if (config.contains("peak_core_power_w"))
+    parsed_config.peak_core_power_w = config["peak_core_power_w"];
+
   parsed_config.icnt_freq = get_config_value<uint32_t>(config, "icnt_freq");
   if (config.contains("icnt_latency"))
     parsed_config.icnt_latency = config["icnt_latency"];

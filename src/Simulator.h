@@ -8,6 +8,7 @@
 #include "scheduler/Scheduler.h"
 #include "scheduler/LanguageScheduler.h"
 #include "DSENTWrapper.h"
+#include "ThreeDICEWrapper.h"
 #include <queue>
 
 #define CORE_MASK 0x1 << 1
@@ -85,6 +86,17 @@ class Simulator {
   uint64_t _icnt_interval=0;
   uint64_t _total_flits_from_core=0;
 
+  // 3DICE stats
+  std::unique_ptr<ThreeDICEWrapper> _3dice;
+  std::vector<double> _systemPower;
+  uint64_t _3dice_cycles   = 0;
+  uint64_t _3dice_interval = 0;
+  double   _peak_core_temp_c = 0.0;
+  double   _peak_hbm_temp_c  = 0.0;
+  double   _peak_noc_temp_c  = 0.0;
+  std::vector<double> _core_power_w;
+  std::vector<double> _hbm_power_w;
+  std::vector<double> _noc_power_w;
 
   struct CompareModel {
     bool operator()(const std::unique_ptr<Model>& a, const std::unique_ptr<Model>& b) const {

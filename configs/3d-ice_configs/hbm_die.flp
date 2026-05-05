@@ -1,0 +1,7 @@
+HBM_CH0 :
+    position    0, 0 ;
+    dimension 4000, 9000 ;
+
+HBM_CH1 :
+    position 4000, 0 ;
+    dimension 4000, 9000 ;
