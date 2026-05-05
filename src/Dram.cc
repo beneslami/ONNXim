@@ -13,8 +13,7 @@ uint32_t Dram::get_channel_id(MemoryAccess* access) {
 }
 
 /* FIXME: Simple DRAM has bugs */
-SimpleDram::SimpleDram(SimulationConfig config)
-    : _latency(config.dram_latency) {
+SimpleDram::SimpleDram(SimulationConfig config) : _latency(config.dram_latency) {
   _cycles = 0;
   _config = config;
   _n_ch = config.dram_channels;
@@ -137,8 +136,7 @@ DramRamulator2::DramRamulator2(SimulationConfig config) {
   _config = config;
   _mem.resize(_n_ch);
   for (int ch = 0; ch < _n_ch; ch++) {
-    _mem[ch] = std::make_unique<NDPSim::Ramulator2>(
-      ch, _n_ch, config.dram_config_path, "Ramulator2", _config.dram_print_interval, 1);
+    _mem[ch] = std::make_unique<NDPSim::Ramulator2>(ch, _n_ch, config.dram_config_path, "Ramulator2", _config.dram_print_interval, 1);
   }
   _tx_log2 = log2(_req_size);
   _tx_ch_log2 = log2(_n_ch) + _tx_log2;
@@ -189,6 +187,7 @@ MemoryAccess* DramRamulator2::top(uint32_t cid) {
 void DramRamulator2::pop(uint32_t cid) {
   assert(!is_empty(cid));
   NDPSim::mem_fetch* mf = _mem[cid]->return_queue_pop();
+  //_processed_requests[cid]++;
   delete mf;
 }
 
@@ -198,34 +197,39 @@ void DramRamulator2::print_stat() {
   }
 }
 
-DramDRAMsim3::DramDRAMsim3(SimulationConfig config) {
+/// DRAMsim3-based DRAM model////////
+DramDRAMsim3::DramDRAMsim3(SimulationConfig config, uint64_t freq) {
   _n_ch = config.dram_channels;
   _req_size = config.dram_req_size;
   _config = config;
+  _frequency = freq;
   _cycles = 0;
   _tx_log2 = log2(_req_size);
   _tx_ch_log2 = log2(_n_ch) + _tx_log2;
-
+  _peak_bandwidth_gbps_per_channel = (_req_size * _frequency) / (1024.0); // convert to GB/s
   _mem.resize(_n_ch);
   _pending.resize(_n_ch);
   _response_queue.resize(_n_ch);
+  _stats.resize(_n_ch);
+  _total_processed_requests.resize(_n_ch);
+  _processed_requests.resize(_n_ch);
+  _last_epoch_cycle.resize(_n_ch);
+  for (int ch = 0; ch < _n_ch; ch++) {
+    _total_processed_requests[ch] = 0;
+    _processed_requests[ch] = 0;
+    _last_epoch_cycle[ch] = 0;
+  }
 
   char* onnxim_path_env = std::getenv("ONNXIM_HOME");
-  std::string onnxim_path = onnxim_path_env != NULL ?
-      std::string(onnxim_path_env) : std::string("./");
-  std::string dramsim3_config = fs::path(onnxim_path)
-                                    .append("configs")
-                                    .append(config.dram_config_path)
-                                    .string();
+  std::string onnxim_path = onnxim_path_env != NULL ? std::string(onnxim_path_env) : std::string("./");
+  std::string dramsim3_config = fs::path(onnxim_path).append("configs").append(config.dram_config_path).string();
 
   for (int ch = 0; ch < _n_ch; ch++) {
-    _mem[ch] = std::make_unique<dramsim3::MemorySystem>(
-        dramsim3_config,
-        "./",
+    _mem[ch] = std::make_unique<dramsim3::MemorySystem>(dramsim3_config, "./",
         [this, ch](uint64_t addr) { this->read_callback(ch, addr);  },
         [this, ch](uint64_t addr) { this->write_callback(ch, addr); }
     );
-}
+  }
 }
 
 DramDRAMsim3::~DramDRAMsim3() {}
@@ -271,6 +275,8 @@ MemoryAccess* DramDRAMsim3::top(uint32_t cid) {
 void DramDRAMsim3::pop(uint32_t cid) {
   assert(!is_empty(cid));
   _response_queue[cid].pop();
+  _processed_requests[cid]++;
+  _total_processed_requests[cid]++;
 }
 
 void DramDRAMsim3::read_callback(uint32_t cid, uint64_t addr) {
@@ -293,4 +299,36 @@ void DramDRAMsim3::print_stat() {
     spdlog::info("DRAMsim3 CH[{}] stats:", ch);
     _mem[ch]->PrintStats();
   }
+}
+
+void DramDRAMsim3::collectEpochStats() {
+  for (int ch = 0; ch < _n_ch; ch++) {
+      double elapsed_cycles = (double)(_cycles - _last_epoch_cycle[ch]);
+      if (elapsed_cycles <= 0) {
+          _stats[ch] = {};
+          continue;
+      }
+      double elapsed_sec = elapsed_cycles / ((double)_frequency * 1e6);
+      double total_gb = (double)_processed_requests[ch] * _req_size / (1024.0 * 1024.0 * 1024.0);
+      _stats[ch].bandwidth_gbps     = total_gb / elapsed_sec;
+      _stats[ch].bandwidth_util_pct = (float)(_stats[ch].bandwidth_gbps / _peak_bandwidth_gbps_per_channel) * 100.0;
+      _stats[ch].power_mw           = _mem[ch]->GetEpochPowerMW();
+      _processed_requests[ch]  = 0;
+      _last_epoch_cycle[ch]    = _cycles;
+  }
+}
+
+double DramDRAMsim3::getAggregateBandwidthGBps() const {
+    double total = 0.0;
+    for (int ch = 0; ch < _n_ch; ch++)
+        total += _stats[ch].bandwidth_gbps;
+    return total;
+}
+
+float DramDRAMsim3::getAggregateBandwidthUtilization() const {
+    double total_actual_gbps = 0.0;
+    double total_peak_gbps   = _peak_bandwidth_gbps_per_channel * _n_ch;
+    for (int ch = 0; ch < _n_ch; ch++)
+        total_actual_gbps += _stats[ch].bandwidth_gbps;
+    return (float)(total_actual_gbps / total_peak_gbps) * 100.0;
 }
