@@ -1,0 +1,19 @@
+PLAT = _OPENMP
+TMGLIB       = libtmglib.a
+SUPERLULIB   = libsuperlu_mt$(PLAT).a
+BLASDEF      = -DUSE_VENDOR_BLAS
+BLASLIB      = -lopenblas
+MATHLIB      = -lm
+MPLIB        = -fopenmp
+ARCH         = ar
+ARCHFLAGS    = cr
+RANLIB       = ranlib
+PREDEFS      = -D__OPENMP
+CC           = gcc
+CFLAGS       = -fopenmp -O3 -fPIC $(PREDEFS) -DPRNTlevel=0 -D_LONGINT -DAdd_ -Wno-error -w
+NOOPTS       = -O0
+FORTRAN      = gfortran
+FFLAGS       = -O3
+LOADER       = gcc
+LOADOPTS     = -fopenmp
+CDEFS        = -DNoChange
