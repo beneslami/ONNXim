@@ -96,7 +96,7 @@ class Simulator {
   double   _peak_noc_temp_c  = 0.0;
   std::vector<double> _core_power_w;
   std::vector<double> _hbm_power_w;
-  std::vector<double> _noc_power_w;
+  std::vector<double> _noc_node_power_w;
 
   struct CompareModel {
     bool operator()(const std::unique_ptr<Model>& a, const std::unique_ptr<Model>& b) const {
