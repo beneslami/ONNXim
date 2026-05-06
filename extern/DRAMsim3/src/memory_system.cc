@@ -48,6 +48,10 @@ MemorySystem* GetMemorySystem(const std::string &config_file, const std::string 
     return new MemorySystem(config_file, output_dir, read_callback, write_callback);
 }
 
+void MemorySystem::UpdateEpochStats() {
+    dram_system_->PrintEpochStats();  // computes calculated_ map
+}
+
 double MemorySystem::GetEpochPowerMW() const {
     return dram_system_->GetEpochPowerMW();
 }

@@ -124,7 +124,7 @@ class DramDRAMsim3 : public Dram, public DramWithStats {
 
   void collectEpochStats() override;
   int getNumChannels() const override { return _n_ch; }
-  double getChannelEpochPowerMW(int ch) const override { return _mem[ch]->GetEpochPowerMW(); }
+  double getChannelEpochPowerMW(int ch) const override { return _stats[ch].power_mw; }
   double getBandwidthGBpsPerChannel(int ch) const override { return _stats[ch].bandwidth_gbps; }
   float  getBandwidthUtilizationPerChannel(int ch) const override { return _stats[ch].bandwidth_util_pct; }
   double getAggregateBandwidthGBps() const override;
@@ -133,7 +133,7 @@ class DramDRAMsim3 : public Dram, public DramWithStats {
   double getEpochPowerMW() {
     double total = 0.0;
     for (int ch = 0; ch < _n_ch; ch++) {
-        total += _mem[ch]->GetEpochPowerMW();
+        total += _stats[ch].power_mw;
     }
     return total;
   }

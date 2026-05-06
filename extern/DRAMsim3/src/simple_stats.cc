@@ -21,8 +21,7 @@ SimpleStats::SimpleStats(const Config& config, int channel_id) : config_(config)
     InitStat("num_writes_done", "counter", "Number of read requests issued");
     InitStat("num_write_buf_hits", "counter", "Number of write buffer hits");
     InitStat("num_read_row_hits", "counter", "Number of read row buffer hits");
-    InitStat("num_write_row_hits", "counter",
-             "Number of write row buffer hits");
+    InitStat("num_write_row_hits", "counter", "Number of write row buffer hits");
     InitStat("num_read_cmds", "counter", "Number of READ/READP commands");
     InitStat("num_write_cmds", "counter", "Number of WRITE/WRITEP commands");
     InitStat("num_act_cmds", "counter", "Number of ACT commands");
@@ -42,35 +41,26 @@ SimpleStats::SimpleStats(const Config& config, int channel_id) : config_(config)
     InitStat("refb_energy", "double", "Refresh-bank energy");
 
     // Vector counter stats
-    InitVecStat("all_bank_idle_cycles", "vec_counter",
-                "Cyles of all bank idle in rank", "rank", config_.ranks);
-    InitVecStat("rank_active_cycles", "vec_counter", "Cyles of rank active",
-                "rank", config_.ranks);
-    InitVecStat("sref_cycles", "vec_counter", "Cyles of rank in SREF mode",
-                "rank", config_.ranks);
+    InitVecStat("all_bank_idle_cycles", "vec_counter", "Cyles of all bank idle in rank", "rank", config_.ranks);
+    InitVecStat("rank_active_cycles", "vec_counter", "Cyles of rank active", "rank", config_.ranks);
+    InitVecStat("sref_cycles", "vec_counter", "Cyles of rank in SREF mode", "rank", config_.ranks);
 
     // Vector of double stats
-    InitVecStat("act_stb_energy", "vec_double", "Active standby energy", "rank",
-                config_.ranks);
-    InitVecStat("pre_stb_energy", "vec_double", "Precharge standby energy",
-                "rank", config_.ranks);
-    InitVecStat("sref_energy", "vec_double", "SREF energy", "rank",
-                config_.ranks);
+    InitVecStat("act_stb_energy", "vec_double", "Active standby energy", "rank", config_.ranks);
+    InitVecStat("pre_stb_energy", "vec_double", "Precharge standby energy", "rank", config_.ranks);
+    InitVecStat("sref_energy", "vec_double", "SREF energy", "rank", config_.ranks);
 
     // Histogram stats
     InitHistoStat("read_latency", "Read request latency (cycles)", 0, 200, 10);
     InitHistoStat("write_latency", "Write cmd latency (cycles)", 0, 200, 10);
-    InitHistoStat("interarrival_latency",
-                  "Request interarrival latency (cycles)", 0, 100, 10);
+    InitHistoStat("interarrival_latency", "Request interarrival latency (cycles)", 0, 100, 10);
 
     // some irregular stats
     InitStat("average_bandwidth", "calculated", "Average bandwidth");
     InitStat("total_energy", "calculated", "Total energy (pJ)");
     InitStat("average_power", "calculated", "Average power (mW)");
-    InitStat("average_read_latency", "calculated",
-             "Average read request latency (cycles)");
-    InitStat("average_interarrival", "calculated",
-             "Average request interarrival latency (cycles)");
+    InitStat("average_read_latency", "calculated", "Average read request latency (cycles)");
+    InitStat("average_interarrival", "calculated", "Average request interarrival latency (cycles)");
 }
 
 void SimpleStats::AddValue(const std::string name, const int value) {
@@ -354,26 +344,18 @@ void SimpleStats::UpdateEpochStats() {
     UpdateCounters();
 
     // update computed stats
-    doubles_["act_energy"] =
-        epoch_counters_["num_act_cmds"] * config_.act_energy_inc;
-    doubles_["read_energy"] =
-        epoch_counters_["num_read_cmds"] * config_.read_energy_inc;
-    doubles_["write_energy"] =
-        epoch_counters_["num_write_cmds"] * config_.write_energy_inc;
-    doubles_["ref_energy"] =
-        epoch_counters_["num_ref_cmds"] * config_.ref_energy_inc;
-    doubles_["refb_energy"] =
-        epoch_counters_["num_refb_cmds"] * config_.refb_energy_inc;
+    doubles_["act_energy"] = epoch_counters_["num_act_cmds"] * config_.act_energy_inc;
+    doubles_["read_energy"] = epoch_counters_["num_read_cmds"] * config_.read_energy_inc;
+    doubles_["write_energy"] = epoch_counters_["num_write_cmds"] * config_.write_energy_inc;
+    doubles_["ref_energy"] = epoch_counters_["num_ref_cmds"] * config_.ref_energy_inc;
+    doubles_["refb_energy"] = epoch_counters_["num_refb_cmds"] * config_.refb_energy_inc;
 
     // vector doubles, update first, then push
     double background_energy = 0.0;
     for (int i = 0; i < config_.ranks; i++) {
-        double act_stb = epoch_vec_counters_["rank_active_cycles"][i] *
-                         config_.act_stb_energy_inc;
-        double pre_stb = epoch_vec_counters_["all_bank_idle_cycles"][i] *
-                         config_.pre_stb_energy_inc;
-        double sref_energy =
-            epoch_vec_counters_["sref_cycles"][i] * config_.sref_energy_inc;
+        double act_stb = epoch_vec_counters_["rank_active_cycles"][i] * config_.act_stb_energy_inc;
+        double pre_stb = epoch_vec_counters_["all_bank_idle_cycles"][i] * config_.pre_stb_energy_inc;
+        double sref_energy = epoch_vec_counters_["sref_cycles"][i] * config_.sref_energy_inc;
         vec_doubles_["act_stb_energy"][i] = act_stb;
         vec_doubles_["pre_stb_energy"][i] = pre_stb;
         vec_doubles_["sref_energy"][i] = sref_energy;
@@ -394,10 +376,8 @@ void SimpleStats::UpdateEpochStats() {
                           doubles_["refb_energy"] + background_energy;
     calculated_["total_energy"] = total_energy;
     calculated_["average_power"] = total_energy / epoch_counters_["num_cycles"];
-    calculated_["average_read_latency"] =
-        GetHistoAvg(epoch_histo_counts_.at("read_latency"));
-    calculated_["average_interarrival"] =
-        GetHistoAvg(epoch_histo_counts_.at("interarrival_latency"));
+    calculated_["average_read_latency"] = GetHistoAvg(epoch_histo_counts_.at("read_latency"));
+    calculated_["average_interarrival"] = GetHistoAvg(epoch_histo_counts_.at("interarrival_latency"));
 
     UpdatePrints(true);
     for (auto& it : epoch_counters_) {

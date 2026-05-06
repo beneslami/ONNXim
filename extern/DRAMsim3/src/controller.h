@@ -22,8 +22,7 @@ enum class RowBufPolicy { OPEN_PAGE, CLOSE_PAGE, SIZE };
 class Controller {
    public:
 #ifdef THERMAL
-    Controller(int channel, const Config &config, const Timing &timing,
-               ThermalCalculator &thermalcalc);
+    Controller(int channel, const Config &config, const Timing &timing, ThermalCalculator &thermalcalc);
 #else
     Controller(int channel, const Config &config, const Timing &timing);
 #endif  // THERMAL

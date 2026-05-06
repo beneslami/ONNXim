@@ -91,6 +91,7 @@ void BaseDRAMSystem::RegisterCallbacks(
     write_callback_ = write_callback;
 }
 
+//////////////////////
 JedecDRAMSystem::JedecDRAMSystem(Config &config, const std::string &output_dir,
                                  std::function<void(uint64_t)> read_callback,
                                  std::function<void(uint64_t)> write_callback)
@@ -117,8 +118,7 @@ JedecDRAMSystem::~JedecDRAMSystem() {
     }
 }
 
-bool JedecDRAMSystem::WillAcceptTransaction(uint64_t hex_addr,
-                                            bool is_write) const {
+bool JedecDRAMSystem::WillAcceptTransaction(uint64_t hex_addr, bool is_write) const {
     int channel = GetChannel(hex_addr);
     return ctrls_[channel]->WillAcceptTransaction(hex_addr, is_write);
 }

@@ -6,8 +6,7 @@
 namespace dramsim3 {
 
 #ifdef THERMAL
-Controller::Controller(int channel, const Config &config, const Timing &timing,
-                       ThermalCalculator &thermal_calc)
+Controller::Controller(int channel, const Config &config, const Timing &timing, ThermalCalculator &thermal_calc)
 #else
 Controller::Controller(int channel, const Config &config, const Timing &timing)
 #endif  // THERMAL

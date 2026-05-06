@@ -1,7 +1,9 @@
 #include "Dram.h"
-
 #include "helper/HelperFunctions.h"
 #include "Hashing.h"
+
+#include <fcntl.h>
+#include <unistd.h>
 
 uint32_t Dram::get_channel_id(MemoryAccess* access) {
   uint32_t channel_id;
@@ -308,6 +310,14 @@ void DramDRAMsim3::collectEpochStats() {
           _stats[ch] = {};
           continue;
       }
+      int saved = dup(STDOUT_FILENO);
+      int devnull = open("/dev/null", O_WRONLY);
+      dup2(devnull, STDOUT_FILENO);
+      close(devnull);
+      _mem[ch]->UpdateEpochStats();  // populates calculated_ map
+      dup2(saved, STDOUT_FILENO);
+      close(saved);
+      
       double elapsed_sec = elapsed_cycles / ((double)_frequency * 1e6);
       double total_gb = (double)_processed_requests[ch] * _req_size / (1024.0 * 1024.0 * 1024.0);
       _stats[ch].bandwidth_gbps     = total_gb / elapsed_sec;
@@ -315,6 +325,11 @@ void DramDRAMsim3::collectEpochStats() {
       _stats[ch].power_mw           = _mem[ch]->GetEpochPowerMW();
       _processed_requests[ch]  = 0;
       _last_epoch_cycle[ch]    = _cycles;
+      if (std::isnan(_stats[ch].power_mw) || _stats[ch].power_mw < 0.0) {
+          spdlog::warn("[DRAM] CH{} power is NaN/negative at cycle {} — using 0",
+                      ch, _cycles);
+          _stats[ch].power_mw = 0.0;
+      }
   }
 }
 
