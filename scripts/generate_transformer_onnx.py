@@ -1,6 +1,9 @@
 import json
 from onnxruntime.transformers import optimizer
-from optimum.onnxruntime import ORTModelForQuestionAnswering
+try:
+    from optimum.onnxruntime import ORTModelForQuestionAnswering
+except ImportError:
+    ORTModelForQuestionAnswering = None
 import argparse
 import pathlib
 import os
@@ -14,7 +17,7 @@ args = parser.parse_args()
 if "gpt2" in args.model:
     onnx_path = pathlib.Path(f"{args.model}.onnx")
     if not onnx_path.is_file():
-        os.system(f"python3.8 -m onnxruntime.transformers.models.gpt2.convert_to_onnx -m {args.model} --model_class GPT2LMHeadModel -t 1 -r 1 --output {args.model}.onnx -p fp32")
+        os.system(f"python3 -m onnxruntime.transformers.models.gpt2.convert_to_onnx -m {args.model} --model_class GPT2LMHeadModel -t 1 -r 1 --output {args.model}.onnx -p fp32")
     if args.model == "gpt2":
         optimized_model = optimizer.optimize_model(f"{args.model}.onnx", model_type="gpt2", num_heads=12, hidden_size=768)
     elif args.model == "gpt2-medium":
