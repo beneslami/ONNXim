@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <spdlog/spdlog.h>
+#include <iomanip>
 
 extern "C" {
 #include "stack_description.h"
@@ -22,6 +23,8 @@ struct ThreeDICEImpl {
     ThermalData_t      tdata;
     uint32_t           n_flp_elements = 0;
     std::string        original_dir;
+    std::vector<double> last_valid_temps;
+    std::vector<ComponentThermalStats> stats;  // one per floorplan element
 };
 
 ThreeDICEWrapper::ThreeDICEWrapper(const std::string& stk_path) : _impl(std::make_unique<ThreeDICEImpl>())
@@ -31,8 +34,8 @@ ThreeDICEWrapper::ThreeDICEWrapper(const std::string& stk_path) : _impl(std::mak
     std::string stk_filename = fs::path(stk_path).filename().string();
 
     stack_description_init(&_impl->stkd);
-    analysis_init         (&_impl->analysis);
-    output_init           (&_impl->output);
+    analysis_init(&_impl->analysis);
+    output_init(&_impl->output);
 
     if (parse_stack_description_file((String_t)stk_filename.c_str(), &_impl->stkd, &_impl->analysis, &_impl->output) != TDICE_SUCCESS) {
         fs::current_path(_impl->original_dir);
@@ -48,15 +51,43 @@ ThreeDICEWrapper::ThreeDICEWrapper(const std::string& stk_path) : _impl(std::mak
         throw std::runtime_error("3D-ICE: thermal_data_build failed");
     }
 
+    // Extract floorplan element names in bottom→top order
+    // matching temperature extraction order in computeTemperatures()
+    std::vector<StackElement_t*> stkel_vec;
+    for (StackElementListNode_t *node =
+            stack_element_list_begin(&_impl->stkd.StackElements);
+        node != NULL;
+        node = stack_element_list_next(node))
+        stkel_vec.push_back(stack_element_list_data(node));
+
+    // Reverse: stk file is top→bottom, we want bottom→top
+    for (int i = (int)stkel_vec.size()-1; i >= 0; i--) {
+        StackElement_t *stkel = stkel_vec[i];
+        if (stkel->SEType != TDICE_STACK_ELEMENT_DIE) continue;
+
+        Floorplan_t *flp = &stkel->Pointer.Die->Floorplan;
+        FloorplanElementListNode_t *feln;
+
+        for (feln  = floorplan_element_list_begin(&flp->ElementsList);
+            feln != NULL;
+            feln  = floorplan_element_list_next(feln)) {
+            FloorplanElement_t *fel = floorplan_element_list_data(feln);
+            ComponentThermalStats s;
+            s.name = std::string(fel->Id);
+            _impl->stats.push_back(s);
+            spdlog::info("[3DICE] Registered component: {}", s.name);
+        }
+    }
+
     fs::current_path(_impl->original_dir);
     _impl->n_flp_elements = get_total_number_of_floorplan_elements(&_impl->stkd);
     spdlog::info("[3DICE] Initialized: {} floorplan elements", _impl->n_flp_elements);
 }
 
 ThreeDICEWrapper::~ThreeDICEWrapper() {
-    thermal_data_destroy      (&_impl->tdata);
+    thermal_data_destroy(&_impl->tdata);
     stack_description_destroy (&_impl->stkd);
-    output_destroy            (&_impl->output);
+    output_destroy(&_impl->output);
 }
 
 double ThreeDICEWrapper::getStepTimeSec() const {
@@ -87,9 +118,7 @@ std::vector<double> ThreeDICEWrapper::computeTemperatures(const std::vector<doub
     std::vector<double> temps;
     std::vector<StackElement_t*> stkel_vec;
 
-    for (StackElementListNode_t *node = stack_element_list_begin(&_impl->stkd.StackElements);
-         node != NULL;
-         node = stack_element_list_next(node))
+    for (StackElementListNode_t *node = stack_element_list_begin(&_impl->stkd.StackElements); node != NULL; node = stack_element_list_next(node))
         stkel_vec.push_back(stack_element_list_data(node));
 
     for (int i = (int)stkel_vec.size()-1; i >= 0; i--) {
@@ -108,4 +137,31 @@ std::vector<double> ThreeDICEWrapper::computeTemperatures(const std::vector<doub
         free(tmax);
     }
     return temps;
+}
+
+void ThreeDICEWrapper::updateStats(const std::vector<double>& temps) {
+    if (temps.size() != _impl->stats.size()) return;
+    for (uint32_t i = 0; i < temps.size(); i++)
+        _impl->stats[i].update(temps[i]);
+}
+
+void ThreeDICEWrapper::printFinalStats() const {
+    std::cout << std::left  << std::setw(15) << "Component"
+            << std::right << std::setw(10) << "Min(°C)"
+                            << std::setw(10) << "Max(°C)"
+                            << std::setw(10) << "Avg(°C)"
+                            << std::setw(10) << "Samples" << "\n";
+    std::cout << std::string(60, '-') << "\n";
+    for (const auto& s : _impl->stats) {
+        std::cout << std::left  << std::setw(15) << s.name
+                << std::right << std::fixed << std::setprecision(2)
+                                << std::setw(10) << (s.temp_min == std::numeric_limits<double>::max() ? 0.0 : s.temp_min)
+                                << std::setw(10) << s.temp_max
+                                << std::setw(10) << s.temp_avg()
+                                << std::setw(10) << s.samples << "\n";
+    }
+}
+
+const std::vector<ComponentThermalStats>& ThreeDICEWrapper::getStats() const {
+    return _impl->stats;
 }
