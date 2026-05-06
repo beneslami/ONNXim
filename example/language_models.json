@@ -1,11 +1,11 @@
 {
   "models": [
      {
-         "name": "opt-125m",
+         "name": "gpt2",
          "trace_file" : "input.csv",
          "scheduler" : "simple",
          "scheduler_config": {
-             "max_batch_size": 8  
+             "max_batch_size": 8
           }
      }
   ]
