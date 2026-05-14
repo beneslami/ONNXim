@@ -14,7 +14,7 @@ Simulator::Simulator(SimulationConfig config, bool language_mode) : _config(conf
     spdlog::info("[Core {}] Systolic Array Throughput: {} GFLOPS, Spad size: {} KB, Accumulator size: {} KB",
       i, config.max_systolic_flops(i), config.core_config[i].spad_size, config.core_config[i].accum_spad_size);
   spdlog::info("DRAM Bandwidth {} GB/s", config.max_dram_bandwidth());
-  _core_period = 1000000 / (config.core_freq);
+  _core_period = 1000000 / (config.core_freq); // in picoseconds
   _icnt_period = 1000000 / (config.icnt_freq);
   _dram_period = 1000000 / (config.dram_freq);
   _core_time = 0;
@@ -218,6 +218,7 @@ void Simulator::cycle() {
               _cores[core_id]->pop_memory_request();
               _nr_from_core++;
               _nr_from_core_list[core_id / _noc_node_per_core]++;
+              _total_flits_from_core ++;
             }
           }
           // Push response from ICNT. to Core.
@@ -244,7 +245,7 @@ void Simulator::cycle() {
           _nr_from_mem++;
         }
       }
-      _total_flits_from_core += _nr_from_core;
+      
       if (_icnt_interval != 0 && _icnt_cycle % _icnt_interval == 0) {        
         if (_dsent) {
           // Per-epoch injection rate (current interval only)
@@ -254,10 +255,9 @@ void Simulator::cycle() {
             if(core_inj_rate > 0) {
               double epoch_power_w = _dsent->computePower(core_inj_rate);  // capture return value
               _noc_node_power_w[i/_noc_node_per_core] = epoch_power_w;
-              double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12;
+              double epoch_sec = (_icnt_interval * _icnt_period) * 1e-12; //fix me
               double _noc_energy_joules = epoch_power_w * epoch_sec;  // accumulate energy
               _total_noc_energy_joules += _noc_energy_joules;
-              _total_noc_power_w += epoch_power_w;
               spdlog::info("[DSENT] Router={} inj_rate={:.4f} power={:.4f}W energy_so_far={:.6f}uJ cycle={}", i, core_inj_rate, epoch_power_w, _noc_energy_joules * 1e6, _core_cycles);
               _nr_from_core_list[i] = 0; // reset for next interval
             }
@@ -317,17 +317,23 @@ void Simulator::cycle() {
   std::cout << "\n~~~~~~~~~~~~~~ NoC results ~~~~~~~~~~~~~~\n";
   _icnt->print_stats();
   if (_dsent) {
+    double sim_time_sec = (_icnt_cycle * _icnt_period) * 1e-12;
+    double avg_noc_power_w = _total_noc_energy_joules / sim_time_sec;
     std::cout << "total injected flits: " << _total_flits_from_core << "\n";
     std::cout << "total NoC energy (J): " << _total_noc_energy_joules << " J\n";
-    std::cout << "total NoC power (W): " << _total_noc_power_w << " W\n";
+    std::cout << "total NoC power (W): " << avg_noc_power_w << " W\n";
     std::cout << "average energy per flit (J): " << (_total_flits_from_core > 0 ? _total_noc_energy_joules / _total_flits_from_core : 0.0) << " J\n";
-    std::cout << "average power per flit (W): " << (_total_flits_from_core > 0 ? (_total_noc_power_w) / _total_flits_from_core : 0.0) << " W\n";
+    std::cout << "total simulated cycle: " << _icnt_cycle << "\n";
     _dsent->printSummary(_total_flits_from_core / _icnt_cycle); //FIX me
   }
   std::cout << "\n~~~~~~~~~~~~~~ Memory results ~~~~~~~~~~~~~~\n";
   //_dram->print_stat(); prints nothing
   std::cout << "Aggregate Bandwidth: " << _dram_stats->getAggregateBandwidthGBps() << " GB/s\n";
   std::cout << "Aggregate Bandwidth Utilization: " << _dram_stats->getAggregateBandwidthUtilization() << " %\n";
+  for (int ch = 0; ch < _dram_stats->getNumChannels(); ch++) {
+    std::cout << "Channel " << ch << ": total energy = " << _dram_channel_energy_joules[ch] << " J" << std::endl;
+  }
+  std::cout << "total simulated cycle: " << _dram_cycles << "\n";
   std::cout << "\n~~~~~~~~~~~~~~~ 3D-ICE Thermal Summary ~~~~~~~~~~~~~~~~\n";
   _3dice->printFinalStats();
   std::cout << "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n";

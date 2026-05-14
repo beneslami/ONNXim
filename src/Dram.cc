@@ -326,8 +326,7 @@ void DramDRAMsim3::collectEpochStats() {
       _processed_requests[ch]  = 0;
       _last_epoch_cycle[ch]    = _cycles;
       if (std::isnan(_stats[ch].power_mw) || _stats[ch].power_mw < 0.0) {
-          spdlog::warn("[DRAM] CH{} power is NaN/negative at cycle {} — using 0",
-                      ch, _cycles);
+          spdlog::warn("[DRAM] CH{} power is NaN/negative at cycle {} — using 0", ch, _cycles);
           _stats[ch].power_mw = 0.0;
       }
   }

@@ -96,9 +96,7 @@ void GemmWS::initialize_instructions(Tile* tile, Mapping mapping) {
   int elems_per_access = _config.dram_req_size / _config.precision;
 
   addr_type act_sp_base_addr = SPAD_BASE;
-  addr_type weight_sp_base_addr = SPAD_BASE + mapping.tile_in_loop.N *
-                                                  mapping.tile_in_loop.C *
-                                                  _config.precision;
+  addr_type weight_sp_base_addr = SPAD_BASE + mapping.tile_in_loop.N * mapping.tile_in_loop.C * _config.precision;
 
 
   addr_type first_addr, second_addr, third_addr, output_addr;
@@ -111,9 +109,7 @@ void GemmWS::initialize_instructions(Tile* tile, Mapping mapping) {
   int cloop_size = mapping.tile_in_loop.C;
   for (int Ms = 0; Ms < mapping.tile_in_loop.M; Ms += loop_size) {
     int M_offset = tout_m_offset + Ms;
-    int m_loop = M_offset + loop_size > mapping.total_loop.M
-                     ? mapping.total_loop.M - M_offset
-                     : loop_size;
+    int m_loop = M_offset + loop_size > mapping.total_loop.M ? mapping.total_loop.M - M_offset : loop_size;
     if(m_loop <= 0) break;
     /* MOVIN BIAS */
     if(!tile->accum && has_bias) { 
@@ -132,13 +128,9 @@ void GemmWS::initialize_instructions(Tile* tile, Mapping mapping) {
     }
     for (int Cs = 0; Cs < mapping.tile_in_loop.C; Cs+= cloop_size) {
       int C_offset = tout_c_offset + Cs;
-      int c_in_loop = C_offset + cloop_size > mapping.total_loop.C
-                      ? mapping.total_loop.C - C_offset
-                      : cloop_size;
+      int c_in_loop = C_offset + cloop_size > mapping.total_loop.C ? mapping.total_loop.C - C_offset : cloop_size;
       /* MOVIN Weights */
-      addr_type weight_sp_addr =
-            weight_sp_base_addr +
-            (Ms * mapping.tile_in_loop.C + Cs) * _config.precision;
+      addr_type weight_sp_addr = weight_sp_base_addr + (Ms * mapping.tile_in_loop.C + Cs) * _config.precision;
       std::set<addr_type> weight_set;
       for (int iter_m = 0; iter_m < m_loop; iter_m+=1) {
         for (int iter_c = 0; iter_c < c_in_loop; iter_c+=elems_per_access) {
@@ -152,8 +144,7 @@ void GemmWS::initialize_instructions(Tile* tile, Mapping mapping) {
           weight_shape_2d[0] = _weight_shape[Mdim]; 
           index[1] = C;
           index[0] = M;
-          weight_set.insert(
-              second_addr + make_address(index, weight_shape_2d));
+          weight_set.insert(second_addr + make_address(index, weight_shape_2d));
         }
       }
       tile->instructions.push_back(std::make_unique<Instruction>(Instruction{

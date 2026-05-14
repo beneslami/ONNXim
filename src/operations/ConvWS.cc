@@ -3,8 +3,7 @@
 #include "../Model.h"
 #include "../Tensor.h"
 
-ConvWS::ConvWS(SimulationConfig config, Model* model,
-               onnx::NodeProto& node_proto, uint32_t target_core)
+ConvWS::ConvWS(SimulationConfig config, Model* model, onnx::NodeProto& node_proto, uint32_t target_core)
     : Conv(config, model, node_proto, target_core) {}
 
 ConvWS::ConvWS(const Conv& src) : Conv(src) {}
@@ -120,26 +119,17 @@ void ConvWS::initialize_instructions(Tile* tile, Mapping mapping) {
   int tout_c_offset = tile->C * mapping.tile_in_loop.C;
   int tout_s_offset = tile->S * mapping.tile_in_loop.S;
   int tout_r_offset = tile->R * mapping.tile_in_loop.R;
-  int input_h_size = (mapping.tile_in_loop.Q - 1) * _strides[0] +
-                     _dilations[0] * (_kernel_shape[0] - 1) + 1;
-  int input_w_size = (mapping.tile_in_loop.P - 1) * _strides[1] +
-                     _dilations[1] * (_kernel_shape[1] - 1) + 1;
-  int input_h_offset =
-      tout_q_offset - _dilations[0] * (_kernel_shape[0] - 1) / 2;
-  int input_w_offset =
-      tout_p_offset - _dilations[1] * (_kernel_shape[1] - 1) / 2;
+  int input_h_size = (mapping.tile_in_loop.Q - 1) * _strides[0] + _dilations[0] * (_kernel_shape[0] - 1) + 1;
+  int input_w_size = (mapping.tile_in_loop.P - 1) * _strides[1] + _dilations[1] * (_kernel_shape[1] - 1) + 1;
+  int input_h_offset = tout_q_offset - _dilations[0] * (_kernel_shape[0] - 1) / 2;
+  int input_w_offset = tout_p_offset - _dilations[1] * (_kernel_shape[1] - 1) / 2;
   addr_type act_sp_base_addr = SPAD_BASE;
-  addr_type weight_sp_base_addr =
-      SPAD_BASE + mapping.tile_in_loop.N * input_h_size * input_w_size *
-                      mapping.tile_in_loop.C * _config.precision;
+  addr_type weight_sp_base_addr = SPAD_BASE + mapping.tile_in_loop.N * input_h_size * input_w_size * mapping.tile_in_loop.C * _config.precision;
 
   if (tout_n_offset >= mapping.total_loop.N ||
-      tout_m_offset >= mapping.total_loop.M ||
-      tout_q_offset >= mapping.total_loop.Q ||
-      tout_p_offset >= mapping.total_loop.P ||
-      tout_c_offset >= mapping.total_loop.C ||
-      tout_s_offset >= mapping.total_loop.S ||
-      tout_r_offset >= mapping.total_loop.R) {
+      tout_m_offset >= mapping.total_loop.M || tout_q_offset >= mapping.total_loop.Q ||
+      tout_p_offset >= mapping.total_loop.P || tout_c_offset >= mapping.total_loop.C ||
+      tout_s_offset >= mapping.total_loop.S || tout_r_offset >= mapping.total_loop.R) {
     return;
   }
 
@@ -253,8 +243,7 @@ void ConvWS::initialize_instructions(Tile* tile, Mapping mapping) {
           int W = input_w_offset + Ws;
           int C = tout_c_offset + Cs;
           if(C  >= mapping.total_loop.C) break;
-          if (H < 0 || H >= _input_shape[Hdim] || W < 0 ||
-              W >= _input_shape[Wdim])
+          if (H < 0 || H >= _input_shape[Hdim] || W < 0 || W >= _input_shape[Wdim])
             continue;
           act_addr_set.insert(first_addr + make_activation_address(N, H, W, C, _input_shape));
         }
@@ -266,8 +255,7 @@ void ConvWS::initialize_instructions(Tile* tile, Mapping mapping) {
       .opcode = Opcode::MOVIN,
       .dest_addr = act_sp_base_addr,
       .size = (uint32_t)act_addr_set.size(),
-      .src_addrs =
-          std::vector<addr_type>(act_addr_set.begin(), act_addr_set.end()),
+      .src_addrs = std::vector<addr_type>(act_addr_set.begin(), act_addr_set.end()),
       .operand_id = _INPUT_OPERAND}));
   sram_allocation += act_addr_set.size();
   act_allocation += act_addr_set.size();

@@ -110,8 +110,7 @@ int main(int argc, char** argv) {
       std::string model_name = model_config["name"];
       std::string onnx_path =
           fmt::format("{}/{}/{}.onnx", model_base_path, model_name, model_name);
-      std::string mapping_path = fmt::format("{}/{}/{}.mapping", model_base_path,
-                                            model_name, model_name);
+      std::string mapping_path = fmt::format("{}/{}/{}.mapping", model_base_path, model_name, model_name);
       MappingTable mapping_table = MappingTable::parse_mapping_file(mapping_path, config);
 
       auto model = std::make_unique<Model>(onnx_path, model_config, config, model_name, mapping_table);

@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <spdlog/spdlog.h>
 #include <iomanip>
+#include <iostream>
 
 extern "C" {
 #include "stack_description.h"

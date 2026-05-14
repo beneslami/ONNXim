@@ -63,6 +63,10 @@ Conv::Conv(SimulationConfig config, Model* model, onnx::NodeProto& node_proto, u
   assert(kernel_dim == 2);
 
   _input_shape = get_input(0)->get_dims();
+  //DEBUG: remove after fixing
+  spdlog::info("Conv {} input_shape size={} dims=[{}]",
+    _name, _input_shape.size(),
+    fmt::join(_input_shape, ","));
   int shape_offset = 0;
   _conv_out_shape.resize(4);
   _conv_out_shape[Cdim] = get_input(1)->get_dims()[Mdim];  // CoCiHW
