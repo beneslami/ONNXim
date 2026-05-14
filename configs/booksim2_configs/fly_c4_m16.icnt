@@ -1,8 +1,8 @@
 [config]
 use_map = 0
-flit_size = 16
+flit_size = 64
 topology = fly
-k = 3
+k = 20
 n = 1
 routing_function = dest_tag
 subnets = 1

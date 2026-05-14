@@ -2,7 +2,7 @@ material silicon :
     thermal conductivity     1.30e-04 ;
     volumetric heat capacity 1.628e-12 ;
 
-material hbm_silicon :
+material lpddr_silicon :
     thermal conductivity     1.48e-04 ;
     volumetric heat capacity 1.660e-12 ;
 
@@ -11,12 +11,12 @@ material beol :
     volumetric heat capacity 2.175e-12 ;
 
 top heat sink :
-    heat transfer coefficient 1.0e-08 ;
+    heat transfer coefficient 1.0e-04 ;
     temperature               313.15 ;
 
 dimensions :
-    chip length 8000 , width 9000 ;
-    cell length  500 , width  500 ;
+    chip length 10000 , width 10000 ;
+    cell length  100 , width  100 ;
 
 die core_die :
     layer  50 silicon ;
@@ -24,19 +24,12 @@ die core_die :
     source  2 silicon ;
     layer  27 beol    ;
 
-die hbm_die :
-    layer  50 hbm_silicon ;
-    source  2 hbm_silicon ;
-    layer   8 beol        ;
-
 stack :
-    die CORE_STACK core_die floorplan "core_die.flp" ;
-    die HBM_STACK  hbm_die  floorplan "hbm_die.flp"  ;
+    die SYSTEM core_die floorplan "core_die.flp" ;
 
 solver :
     transient step 2.5e-6 , slot 2.5e-6 ;
     initial temperature 313.15 ;
 
 output :
-    Tflp ( CORE_STACK , "core_temps.txt" , maximum , final ) ;
-    Tflp ( HBM_STACK  , "hbm_temps.txt"  , maximum , final ) ;
+    Tflp ( SYSTEM , "system_temps.txt" , maximum , final ) ;

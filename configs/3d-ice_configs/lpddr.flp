@@ -1,0 +1,15 @@
+LPDDR_CH0 :
+    position 0, 0
+    dimension 2000, 2000
+
+LPDDR_CH1 :
+    position 6000, 0
+    dimension 2000, 2000
+
+LPDDR_CH2 :
+    position 0, 6000
+    dimension 2000, 2000
+
+LPDDR_CH3 :
+    position 6000, 6000
+    dimension 2000, 2000

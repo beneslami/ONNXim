@@ -1,0 +1,82 @@
+# DSENT 5nm FinFET SOTA Model (Compatibility Mode)
+# Keep the Name as Bulk45LVT so electrical-clos.cfg doesn't crash
+Name = Bulk45LVT
+
+# Supply voltage for 5nm
+Vdd = 0.7
+Temperature = 340
+
+# =============================================================================
+# Transistors (5nm FinFET Physics)
+# =============================================================================
+Gate->PitchContacted = 48.0e-9
+Gate->MinWidth = 25.0e-9
+Gate->CapPerWidth = 1.600e-9
+Drain->CapPerWidth = 1.100e-9
+
+Nmos->CharacterizedTemperature = 300.0
+Pmos->CharacterizedTemperature = 300.0
+
+# 5nm effective resistance
+Nmos->EffResWidth = 4.500e-4               
+Pmos->EffResWidth = 5.800e-4
+
+Nmos->EffResStackRatio = 0.65
+Pmos->EffResStackRatio = 0.55
+
+# 5nm Leakage
+Nmos->OffCurrent = 100e-3
+Pmos->OffCurrent = 100e-3
+Nmos->MinOffCurrent = 10e-9
+Pmos->MinOffCurrent = 10e-9
+
+Nmos->SubthresholdSwing = 0.065
+Pmos->SubthresholdSwing = 0.065
+Nmos->DIBL = 0.045
+Pmos->DIBL = 0.045
+Nmos->SubthresholdTempSwing = 110
+Pmos->SubthresholdTempSwing = 110
+
+# =============================================================================
+# Interconnect (Must include Metal1 to avoid map::at crash)
+# =============================================================================
+Wire->AvailableLayers = [Metal1,Local,Intermediate,Global]
+
+# Metal 1 (Internal Std Cell Routing)
+Wire->Metal1->MinWidth = 16e-9
+Wire->Metal1->MinSpacing = 16e-9
+Wire->Metal1->Resistivity = 8.50e-8
+Wire->Metal1->MetalThickness = 28.0e-9
+Wire->Metal1->DielectricThickness = 24.0e-9
+Wire->Metal1->DielectricConstant = 2.8
+
+# Local (Same as Metal1 for 5nm)
+Wire->Local->MinWidth = 16e-9
+Wire->Local->MinSpacing = 16e-9
+Wire->Local->Resistivity = 8.50e-8
+Wire->Local->MetalThickness = 28.0e-9
+Wire->Local->DielectricThickness = 24.0e-9
+Wire->Local->DielectricConstant = 2.8
+
+# Intermediate
+Wire->Intermediate->MinWidth = 24e-9
+Wire->Intermediate->MinSpacing = 24e-9
+Wire->Intermediate->Resistivity = 5.00e-8
+Wire->Intermediate->MetalThickness = 45e-9
+Wire->Intermediate->DielectricThickness = 40e-9
+Wire->Intermediate->DielectricConstant = 2.70
+
+# Global
+Wire->Global->MinWidth = 45e-9
+Wire->Global->MinSpacing = 45e-9
+Wire->Global->Resistivity = 2.80e-8
+Wire->Global->MetalThickness = 90e-9
+Wire->Global->DielectricThickness = 80e-9
+Wire->Global->DielectricConstant = 2.60
+
+# =============================================================================
+# Standard Cells
+# =============================================================================
+StdCell->Tracks = 6
+StdCell->HeightOverheadFactor = 1.200
+StdCell->AvailableSizes = [1.0, 1.4, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0]

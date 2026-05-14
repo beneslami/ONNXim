@@ -1,31 +1,47 @@
+LPDDR_CH0 :
+    position 0, 0 ;
+    dimension 2000, 2000 ;
+
+LPDDR_CH1 :
+    position 8000, 0 ;
+    dimension 2000, 2000 ;
+
+LPDDR_CH2 :
+    position 0, 8000 ;
+    dimension 2000, 2000 ;
+
+LPDDR_CH3 :
+    position 8000, 8000 ;
+    dimension 2000, 2000 ;
+
 Core0 :
-    position    0,    0 ;
-    dimension 4000, 4000 ;
+    position 2000, 2000 ;
+    dimension 3000, 3000 ;
 
 Core1 :
-    position 4000,    0 ;
-    dimension 4000, 4000 ;
+    position 5000, 2000 ;
+    dimension 3000, 3000 ;
 
 Core2 :
-    position    0, 4000 ;
-    dimension 4000, 4000 ;
+    position 2000, 5000 ;
+    dimension 3000, 3000 ;
 
 Core3 :
-    position 4000, 4000 ;
-    dimension 4000, 4000 ;
+    position 5000, 5000 ;
+    dimension 3000, 3000 ;
 
 Router0 :
-    position    0, 8000 ;
-    dimension 2000, 1000 ;
+    position 2000, 8000 ;
+    dimension 1500, 1000 ;
 
 Router1 :
-    position 2000, 8000 ;
-    dimension 2000, 1000 ;
+    position 3500, 8000 ;
+    dimension 1500, 1000 ;
 
 Router2 :
-    position 4000, 8000 ;
-    dimension 2000, 1000 ;
+    position 5000, 8000 ;
+    dimension 1500, 1000 ;
 
 Router3 :
-    position 6000, 8000 ;
-    dimension 2000, 1000 ;
+    position 6500, 8000 ;
+    dimension 1500, 1000 ;

@@ -1,7 +1,63 @@
 HBM_CH0 :
-    position    0, 0 ;
-    dimension 4000, 9000 ;
+    position 12000, 0.   ;
+    dimension 5500, 1250 ;
 
 HBM_CH1 :
-    position 4000, 0 ;
-    dimension 4000, 9000 ;
+    position 12000, 1250 ;
+    dimension 5500, 1250 ;
+
+HBM_CH2 :
+    position 12000, 2500 ;
+    dimension 5500, 1250 ;
+
+HBM_CH3 :
+    position 12000, 3750 ;
+    dimension 5500, 1250 ;
+
+HBM_CH4 :
+    position 12000, 5000 ;
+    dimension 5500, 1250 ;
+
+HBM_CH5 :
+    position 12000, 6250 ;
+    dimension 5500, 1250 ;
+
+HBM_CH6 :
+    position 12000, 7500 ;
+    dimension 5500, 1250 ;
+
+HBM_CH7 :
+    position 12000, 8750 ;
+    dimension 5500, 1250 ;
+
+HBM_CH8 :
+    position 17500, 0    ;
+    dimension 5500, 1250 ;
+
+HBM_CH9 :
+    position 17500, 1250 ;
+    dimension 5500, 1250 ;
+
+HBM_CH10 :
+    position 17500, 2500 ;
+    dimension 5500, 1250 ;
+
+HBM_CH11 :
+    position 17500, 3750 ;
+    dimension 5500, 1250 ;
+
+HBM_CH12 :
+    position 17500, 5000 ;
+    dimension 5500, 1250 ;
+
+HBM_CH13 :
+    position 17500, 6250 ;
+    dimension 5500, 1250 ;
+
+HBM_CH14 :
+    position 17500, 7500 ;
+    dimension 5500, 1250 ;
+
+HBM_CH15 :
+    position 17500, 8750 ;
+    dimension 5500, 1250 ;
